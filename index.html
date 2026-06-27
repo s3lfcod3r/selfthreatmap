@@ -1,0 +1,3309 @@
+<!DOCTYPE html>
+<!--
+  SelfThreatMap — Live Threat Map (CrowdSec)
+  © s3lfcod3r | https://github.com/s3lfcod3r/selfthreatmap
+  Teil der Self-Suite · Design: Self Brand-Kit (Teal/Cyan)
+  Lizenz: GNU GPL-3.0 — siehe LICENSE
+  https://www.gnu.org/licenses/gpl-3.0.html
+-->
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SelfThreatMap — Live Threat Map</title>
+<!-- Self-Schild Favicon (Teal) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23080c11'/%3E%3Cpath d='M16 3 L28 8 L28 18 C28 24 22 29 16 31 C10 29 4 24 4 18 L4 8 Z' fill='none' stroke='%2333a78c' stroke-width='2'/%3E%3Cpath d='M16 3 L28 8 L28 18 C28 24 22 29 16 31 C10 29 4 24 4 18 L4 8 Z' fill='%2333a78c30'/%3E%3Cpath d='M16 12 l5 8 -5 5 -5 -5 Z' fill='%2343d3ad'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+  :root{--bg:#080c11;--accent:#00e5c8;--danger:#f85149;--warn:#ff6a3d;--ok:#3fb950;--dim:rgba(0,229,200,0.15);--text:#cfe6df;--server:#1db8d4;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--text);height:100%;width:100%;overflow:hidden;touch-action:none;}
+  @media(min-width:681px){body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 6px);pointer-events:none;z-index:999;}}
+  #grid-bg{position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,200,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,200,0.03) 1px,transparent 1px);background-size:50px 50px;z-index:0;}
+
+  /* HEADER - hidden, replaced by map overlay */
+  #header{display:none!important;}
+
+  /* MAP TITLE — schwebt direkt über der Karte (kein extra Leerraum oben) */
+  #map-title-overlay{
+    position:absolute;top:0;left:0;right:0;
+    height:24px;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    z-index:150;pointer-events:none;
+    background:linear-gradient(to bottom,rgba(2,8,16,0.5) 0%,transparent 100%);
+  }
+  #map-title-overlay #h-title{
+    font-family:'Orbitron',monospace;font-size:clamp(8px,1.4vw,13px);font-weight:900;
+    color:var(--accent);text-shadow:0 0 14px var(--accent);
+    letter-spacing:clamp(1px,0.3vw,3px);white-space:nowrap;
+  }
+  #map-title-overlay #h-title span{color:var(--danger);}
+  #map-version-badge{
+    font-family:'Share Tech Mono',monospace;font-size:clamp(7px,0.75vw,9px);
+    color:rgba(0,229,200,0.45);border:1px solid rgba(0,229,200,0.2);
+    border-radius:3px;padding:2px 6px;letter-spacing:1px;white-space:nowrap;
+    background:rgba(0,20,40,0.5);
+  }
+
+  /* SIDEBAR TOOLBAR */
+  #sidebar-toolbar{
+    border-bottom:1px solid var(--dim);
+    background:rgba(0,5,15,0.95);
+    flex-shrink:0;
+  }
+  #sidebar-stats{
+    display:flex;gap:0;border-bottom:1px solid rgba(0,229,200,0.05);
+    padding:5px 10px;justify-content:space-between;
+  }
+  .sb-stat{display:flex;flex-direction:column;align-items:center;min-width:0;}
+  #sidebar-controls{display:none;} /* entfernt — aufgeteilt in toggle-row */
+
+  /* LINIE + ANIMATION — eigene Zeile, volle Breite, zentriert */
+  #toggle-row{
+    display:flex;align-items:stretch;justify-content:center;gap:3px;
+    padding:3px 5px;border-bottom:1px solid var(--dim);
+    background:rgba(0,5,15,0.8);flex-shrink:0;
+  }
+  #toggle-row #lines-toggle,
+  #toggle-row #anim-toggle,
+  #toggle-row #autozoom-toggle {
+    flex:1 1 0;justify-content:center;
+    min-width:0;overflow:hidden;
+    padding:3px 4px;font-size:7px;letter-spacing:0.2px;gap:3px;
+  }
+  #toggle-row #autozoom-toggle span{overflow:hidden;text-overflow:ellipsis;}
+
+  /* CSV neben Seitenzahlen */
+  #feed-pages-wrap{
+    display:flex;align-items:center;justify-content:center;
+    padding:4px 8px;border-top:1px solid var(--dim);
+    background:rgba(0,5,15,0.9);flex-shrink:0;
+  }
+  #feed-pages{
+    display:flex;align-items:center;justify-content:center;
+    gap:4px;flex-wrap:nowrap;
+  }
+  .csv-feed-btn{
+    padding:3px 8px;font-size:clamp(7px,0.85vw,8px);
+    border-color:rgba(0,229,200,0.25);opacity:0.7;flex-shrink:0;
+    white-space:nowrap;
+  }
+  .csv-feed-btn:hover{opacity:1;border-color:var(--accent);color:var(--accent);}
+
+  /* HEADER (old desktop) - keep stat-val/lbl styles referenced elsewhere */
+  .stat-val{font-family:'Orbitron',monospace;font-size:clamp(10px,1.4vw,13px);font-weight:700;color:var(--accent);line-height:1;}
+  .stat-lbl{color:rgba(160,255,216,0.35);font-size:clamp(6px,0.75vw,8px);letter-spacing:1px;white-space:nowrap;}
+  .blink{animation:blink 2s step-end infinite;}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ANIMATION TOGGLE BUTTON */
+  #anim-toggle{
+    display:flex;align-items:center;gap:6px;
+    background:rgba(0,20,40,0.85);border:1px solid var(--dim);
+    border-radius:3px;padding:3px 6px;cursor:pointer;
+    font-family:'Share Tech Mono',monospace;font-size:7px;
+    letter-spacing:0.3px;color:rgba(160,255,216,0.45);
+    transition:all 0.2s;white-space:nowrap;
+    user-select:none;
+  }
+  #anim-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  #anim-toggle.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);}
+  #anim-dot{width:7px;height:7px;border-radius:50%;background:rgba(160,255,216,0.3);transition:background 0.2s;flex-shrink:0;}
+  #anim-toggle.on #anim-dot{background:var(--ok);box-shadow:0 0 6px var(--ok);}
+
+  /* LINES TOGGLE BUTTON */
+  #lines-toggle{
+    display:flex;align-items:center;gap:6px;
+    background:rgba(0,20,40,0.85);border:1px solid var(--dim);
+    border-radius:3px;padding:3px 6px;cursor:pointer;
+    font-family:'Share Tech Mono',monospace;font-size:7px;
+    letter-spacing:0.3px;color:rgba(160,255,216,0.45);
+    transition:all 0.2s;white-space:nowrap;
+    user-select:none;
+  }
+  #lines-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  #lines-toggle.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);}
+  #lines-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok);transition:background 0.2s;flex-shrink:0;}
+  #lines-toggle:not(.on) #lines-dot{background:rgba(160,255,216,0.3);box-shadow:none;}
+
+  /* AUTO-ZOOM TOGGLE (gleiches Design wie Animation / Flüge) */
+  #autozoom-toggle{
+    display:flex;align-items:center;gap:6px;
+    background:rgba(0,20,40,0.85);border:1px solid var(--dim);
+    border-radius:3px;padding:3px 4px;cursor:pointer;
+    font-family:'Share Tech Mono',monospace;font-size:6.5px;
+    letter-spacing:0.2px;color:rgba(160,255,216,0.45);
+    transition:all 0.2s;white-space:nowrap;
+    user-select:none;
+  }
+  #autozoom-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  #autozoom-toggle.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);}
+  #autozoom-toggle.off,
+  #autozoom-toggle:not(.on){
+    border-color:rgba(80,120,110,0.3)!important;
+    color:rgba(120,160,150,0.55)!important;
+    background:rgba(0,8,16,0.55)!important;
+  }
+  #autozoom-dot{width:7px;height:7px;border-radius:50%;background:rgba(160,255,216,0.3);transition:background 0.2s;flex-shrink:0;}
+  #autozoom-toggle.on #autozoom-dot{background:var(--ok);box-shadow:0 0 6px var(--ok);}
+  #autozoom-toggle.off #autozoom-dot,
+  #autozoom-toggle:not(.on) #autozoom-dot{
+    background:rgba(90,110,105,0.45)!important;
+    box-shadow:none!important;
+  }
+
+  .settings-open-btn{
+    margin-left:auto;padding:3px 8px;font-size:7px;letter-spacing:0.3px;
+    font-family:'Share Tech Mono',monospace;background:rgba(0,20,40,0.85);
+    border:1px solid var(--dim);border-radius:3px;color:rgba(160,255,216,0.55);
+    cursor:pointer;white-space:nowrap;transition:all 0.2s;
+  }
+  .settings-open-btn:hover{border-color:var(--accent);color:var(--accent);}
+  #map-mob-controls .settings-open-btn{margin-left:0;padding:1px 6px;font-size:6px;}
+
+  .settings-modal{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;padding:12px;}
+  .settings-modal.hidden{display:none!important;}
+  .settings-backdrop{position:absolute;inset:0;background:rgba(0,4,12,0.82);backdrop-filter:blur(3px);}
+  .settings-panel{
+    position:relative;z-index:1;width:min(460px,96vw);max-height:min(90vh,780px);
+    display:flex;flex-direction:column;background:rgba(4,14,28,0.98);
+    border:1px solid rgba(0,229,200,0.22);border-radius:6px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.55);overflow:hidden;
+  }
+  .settings-panel header{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+    border-bottom:1px solid rgba(0,229,200,0.12);
+  }
+  .settings-panel header h3{margin:0;font-family:Orbitron,monospace;font-size:11px;color:var(--accent);letter-spacing:1px;}
+  #settings-close-btn{background:none;border:none;color:rgba(160,255,216,0.5);cursor:pointer;font-size:14px;padding:2px 6px;}
+  #settings-close-btn:hover{color:var(--accent);}
+  .settings-nav{
+    display:flex;gap:6px;padding:8px 14px;
+    border-bottom:1px solid rgba(0,229,200,0.12);
+    background:rgba(0,10,22,0.9);
+    overflow:auto;
+  }
+  .settings-nav button{
+    border:1px solid rgba(0,229,200,0.2);background:rgba(0,20,40,0.9);
+    color:rgba(160,255,216,0.65);border-radius:999px;padding:4px 9px;
+    font-size:8px;font-family:'Share Tech Mono',monospace;cursor:pointer;white-space:nowrap;
+  }
+  .settings-nav button.active{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.1);}
+  .settings-body{padding:12px 14px;overflow-y:auto;flex:1;}
+  .settings-body section{margin-bottom:14px;}
+  .settings-body section h4{margin:0 0 8px;font-size:8px;letter-spacing:0.8px;color:rgba(160,255,216,0.45);text-transform:uppercase;}
+  .settings-field{display:grid;grid-template-columns:1fr 88px;gap:6px 10px;align-items:center;margin-bottom:7px;font-size:9px;color:rgba(200,230,220,0.75);}
+  .settings-field input[type=number],.settings-field input[type=text],.settings-field select{
+    width:100%;padding:4px 6px;background:rgba(0,12,24,0.9);border:1px solid rgba(0,229,200,0.15);
+    border-radius:3px;color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:10px;
+  }
+  .settings-field select{cursor:pointer;}
+  .settings-field input:disabled{opacity:0.45;}
+  .settings-check{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:9px;color:rgba(200,230,220,0.8);}
+  .settings-hint{font-size:8px;color:rgba(140,170,160,0.5);line-height:1.35;margin:4px 0 0;}
+  .settings-help{
+    margin:0 14px 10px;border:1px solid rgba(0,229,200,0.14);
+    border-radius:4px;background:rgba(0,12,24,0.75);padding:8px 10px;
+    font-size:8px;color:rgba(170,210,195,0.78);line-height:1.35;
+  }
+  .settings-panel footer{
+    display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;
+    border-top:1px solid rgba(0,229,200,0.12);flex-wrap:wrap;
+  }
+  .settings-panel footer button{
+    padding:5px 10px;font-size:8px;font-family:'Share Tech Mono',monospace;
+    border:1px solid rgba(0,229,200,0.2);border-radius:3px;background:rgba(0,20,40,0.9);
+    color:rgba(160,255,216,0.7);cursor:pointer;
+  }
+  .settings-panel footer button:hover{border-color:var(--accent);color:var(--accent);}
+  .settings-panel footer button.primary{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.1);}
+
+  /* LAYOUT */
+  #layout{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;}
+  #map-col{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg);}
+  #map-wrap{flex:1;position:relative;overflow:hidden;cursor:grab;touch-action:none;background:var(--bg);}
+  #map-wrap.panning{cursor:grabbing;}
+  #base-svg{position:absolute;inset:0;width:100%;height:100%;}
+  #arc-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transition:opacity 0.3s ease;}
+  /* dot-svg removed */
+
+  /* LEGEND */
+  #legend{height:32px;background:rgba(2,8,16,0.97);border-top:1px solid var(--dim);display:flex;align-items:center;justify-content:center;gap:clamp(6px,2vw,24px);padding:0 10px;flex-shrink:0;}
+  .leg-item{display:flex;align-items:center;gap:4px;font-size:clamp(7px,0.9vw,9px);letter-spacing:1px;white-space:nowrap;}
+  .leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .leg-label{color:rgba(160,255,216,0.5);}
+  #leg-anim-hint{color:rgba(160,255,216,0.22);font-size:clamp(7px,0.85vw,9px);letter-spacing:1px;}
+  #leg-hint{color:rgba(160,255,216,0.5);font-size:clamp(6px,0.75vw,8px);letter-spacing:0.5px;white-space:nowrap;}
+
+  #map-wrap{position:relative;}
+  .map-panel{position:absolute;z-index:60;pointer-events:auto;background:rgba(4,12,28,0.88);border:1px solid rgba(0,229,200,0.12);border-radius:6px;padding:8px 10px;min-width:140px;max-width:200px;backdrop-filter:blur(6px);font-size:9px;}
+  .map-panel h4{font-family:'Orbitron',monospace;font-size:8px;color:rgba(160,255,216,0.45);margin:0 0 6px 0;letter-spacing:1px;}
+  .map-panel-row{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(0,229,200,0.04);}
+  .map-panel-row:last-child{border-bottom:none;}
+  .map-panel-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .map-panel-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .map-panel-val{font-family:'Orbitron',monospace;color:var(--accent);flex-shrink:0;}
+  #map-panels-left{
+    position:absolute;left:8px;top:28px;z-index:60;
+    display:flex;flex-direction:column;gap:6px;max-width:210px;pointer-events:none;
+  }
+  #map-panels-left .map-panel{position:relative;top:auto;left:auto;right:auto;transform:none;pointer-events:auto;}
+  #replay-bar{
+    position:absolute;bottom:14px;left:50%;transform:translateX(-50%);top:auto;
+    z-index:75;display:flex;align-items:center;gap:8px;padding:6px 14px;
+    background:rgba(4,12,28,0.94);border:1px solid rgba(255,200,0,0.3);
+    border-radius:20px;pointer-events:auto;box-shadow:0 4px 20px rgba(0,0,0,0.5);
+  }
+  @media(max-width:900px){#map-panels-left{display:none;}}
+  .replay-ctrl-btn{
+    width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(255,200,0,0.35);border-radius:50%;background:rgba(0,20,40,0.6);
+    color:#ffcc00;cursor:pointer;font-size:11px;line-height:1;padding:0;
+    font-family:'Share Tech Mono',monospace;transition:all 0.2s;flex-shrink:0;
+  }
+  .replay-ctrl-btn:hover{border-color:#ffcc00;background:rgba(255,200,0,0.12);}
+  .replay-ctrl-btn.active{background:rgba(255,200,0,0.2);border-color:#ffcc00;box-shadow:0 0 8px rgba(255,200,0,0.35);}
+  .replay-ctrl-btn:disabled{opacity:0.35;cursor:not-allowed;}
+  #replay-play-btn::before{content:'▶';margin-left:2px;}
+  #replay-stop-btn::before{content:'■';font-size:9px;}
+  #replay-bar:not(.is-playing) #replay-stop-btn{display:none;}
+  #replay-bar.is-playing #replay-play-btn{display:none;}
+  #replay-bar.is-playing #replay-stop-btn{display:flex;}
+  #replay-bar.is-live{border-color:rgba(0,255,136,0.35);}
+  #replay-bar.is-live .replay-ctrl-btn{border-color:rgba(0,255,136,0.3);color:rgba(160,255,216,0.5);}
+  #replay-clock{font-size:9px;color:rgba(160,255,216,0.7);white-space:nowrap;min-width:140px;text-align:center;}
+  #mode-live-btn{font-size:8px;padding:3px 10px;border:1px solid var(--dim);border-radius:12px;background:transparent;color:rgba(160,255,216,0.45);cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;transition:all 0.2s;}
+  #mode-live-btn:hover{border-color:var(--ok);color:var(--ok);}
+  #mode-live-btn.active{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.12);box-shadow:0 0 8px rgba(0,255,136,0.25);}
+  #map-console-bar{display:flex;flex-direction:column;background:rgba(2,8,16,0.98);border-top:1px solid var(--dim);flex-shrink:0;}
+  #timeline-wrap{padding:6px 12px 4px;}
+  #replay-slider{width:100%;height:4px;-webkit-appearance:none;background:rgba(0,229,200,0.12);border-radius:2px;cursor:pointer;}
+  #replay-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);}
+  #timeline-labels{display:flex;justify-content:space-between;font-size:7px;color:rgba(160,255,216,0.35);padding:0 12px 2px;}
+  #map-window-stats{
+    display:block;
+    flex-shrink:0;
+    padding:5px 10px 4px;
+    border-bottom:1px solid rgba(0,229,200,0.1);
+    background:rgba(0,229,200,0.04);
+  }
+  #footer-stats{display:none;}
+  .map-window-stats-title{
+    font-size:6px;letter-spacing:1px;color:var(--accent);
+    margin-bottom:4px;display:flex;align-items:center;gap:4px;
+  }
+  .map-window-stats-title::before{content:'↑';opacity:0.7;font-size:7px;}
+  .map-window-stats-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+  }
+  .mws-item{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;}
+  .mws-val{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;color:var(--accent);line-height:1;}
+  .mws-lbl{font-size:5px;color:rgba(160,255,216,0.45);letter-spacing:0.3px;text-align:center;}
+  #console-controls{display:flex;flex-direction:column;gap:4px;padding:5px 10px 6px;}
+  @media(min-width:901px){
+    #console-controls{
+      display:flex;flex-direction:row;flex-wrap:wrap;
+      justify-content:center;align-items:center;
+      gap:6px 18px;padding:6px 12px 8px;
+    }
+    #console-controls .console-row{
+      flex:0 1 auto;justify-content:center;width:auto;max-width:100%;
+    }
+    #console-controls .console-legend-row{
+      flex:1 1 100%;justify-content:center;
+    }
+    #console-controls .console-legend-row .ctrl-chip-strip{
+      justify-content:center;flex:0 1 auto;
+    }
+  }
+  .console-row{display:flex;align-items:center;gap:6px;min-width:0;}
+  .ctrl-group-lbl{
+    font-size:6px;color:rgba(160,255,216,0.4);letter-spacing:0.8px;
+    flex-shrink:0;width:38px;line-height:1.2;
+  }
+  .ctrl-chip-strip{
+    display:flex;flex-wrap:nowrap;gap:2px;overflow-x:auto;flex:1;min-width:0;
+    -webkit-overflow-scrolling:touch;padding-bottom:1px;
+  }
+  .ctrl-chip-strip::-webkit-scrollbar{height:2px;}
+  .pill-btn{
+    padding:2px 6px;font-size:7px;border:1px solid rgba(0,229,200,0.18);
+    border-radius:2px;background:rgba(0,12,24,0.5);color:rgba(160,255,216,0.5);
+    cursor:pointer;font-family:'Share Tech Mono',monospace;
+    flex-shrink:0;line-height:1.3;min-height:20px;
+  }
+  .pill-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,229,200,0.12);}
+  .console-legend-row .ctrl-chip-strip{flex-wrap:nowrap;}
+  #threat-legend.console-legend-strip{gap:4px;}
+  #flight-labels-layer{position:absolute;inset:0;pointer-events:none;z-index:45;overflow:visible;}
+  .flight-tag{position:absolute;transform:translate(-50%,-100%);display:flex;align-items:center;gap:3px;padding:1px 5px 1px 4px;background:rgba(6,12,24,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,0.35);white-space:nowrap;max-width:110px;border-left:2px solid var(--tag-accent,#00e5c8);}
+  .flight-tag-flag{font-size:9px;line-height:1;flex-shrink:0;}
+  .flight-tag-line{font-size:6.5px;color:rgba(220,245,255,0.92);font-family:'Share Tech Mono',monospace;line-height:1.15;overflow:hidden;text-overflow:ellipsis;}
+  .flight-tag-line .flight-tag-cc{opacity:0.7;font-weight:600;}
+  .flight-tag-line .flight-tag-sep{opacity:0.35;margin:0 2px;}
+  .flight-tag-line .flight-tag-city{color:#fff;}
+  .threat-leg{display:flex;align-items:center;gap:4px;font-size:7px;color:rgba(160,255,216,0.5);white-space:nowrap;}
+  .threat-leg-dot{width:8px;height:8px;border-radius:2px;}
+  #footer-stats{display:none;align-items:center;justify-content:center;gap:clamp(12px,3vw,28px);padding:6px 12px;border-top:1px solid rgba(0,229,200,0.06);flex-wrap:wrap;}
+  .fstat{display:flex;align-items:center;gap:5px;font-size:9px;}
+  .fstat-val{font-family:'Orbitron',monospace;font-weight:700;color:var(--accent);}
+
+  /* Zoom controls — über Replay-Leiste */
+  #zoom-ctrl{position:absolute;bottom:52px;left:8px;display:flex;flex-direction:column;gap:4px;z-index:50;}
+  .zoom-btn{width:32px;height:32px;background:rgba(0,20,40,0.85);border:1px solid var(--dim);color:var(--accent);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:3px;user-select:none;font-family:'Orbitron',monospace;}
+  .zoom-btn:hover{background:rgba(0,229,200,0.1);}
+  .zoom-btn:active{background:rgba(0,229,200,0.2);}
+  #zoom-level{position:absolute;bottom:52px;left:48px;background:rgba(0,20,40,0.75);border:1px solid var(--dim);color:var(--accent);font-size:8px;padding:3px 6px;border-radius:3px;letter-spacing:1px;z-index:50;pointer-events:none;}
+  #zoom-prefs-panel{
+    position:absolute;bottom:52px;left:8px;width:min(220px,calc(100vw - 24px));
+    background:rgba(0,20,40,0.94);border:1px solid var(--dim);border-radius:4px;
+    padding:8px 10px;z-index:55;display:none;flex-direction:column;gap:6px;
+    font-family:'Share Tech Mono',monospace;font-size:8px;color:rgba(160,255,216,0.75);
+    box-shadow:0 4px 20px rgba(0,0,0,0.45);
+  }
+  #zoom-prefs-panel.open{display:flex;}
+  #zoom-prefs-panel label{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;}
+  #zoom-prefs-panel input[type=range]{width:100%;accent-color:var(--accent);}
+  .zoom-prefs-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+  .zoom-prefs-btn{
+    background:rgba(0,229,200,0.08);border:1px solid var(--dim);color:var(--accent);
+    border-radius:3px;padding:3px 6px;cursor:pointer;font-size:7px;letter-spacing:0.5px;
+    font-family:'Share Tech Mono',monospace;
+  }
+  .zoom-prefs-btn:hover{background:rgba(0,229,200,0.14);}
+  #zoom-prefs-status{color:rgba(160,255,216,0.45);font-size:7px;line-height:1.35;}
+
+  /* SIDEBAR */
+  #sidebar{width:clamp(180px,22vw,250px);background:rgba(0,8,20,0.95);border-left:1px solid var(--dim);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+  #tabs{display:flex;border-bottom:1px solid var(--dim);}
+  .tab{flex:1;padding:8px 2px;text-align:center;font-size:clamp(6px,0.85vw,8px);letter-spacing:1px;color:rgba(160,255,216,0.4);cursor:pointer;border-bottom:2px solid transparent;transition:color 0.2s;}
+  .tab.active{color:var(--accent);border-bottom:2px solid var(--accent);}
+  .tab-content{display:none;flex:1;overflow:hidden;flex-direction:column;}
+  .tab-content.active{display:flex;}
+  #feed,#top10,#topall{flex:1;overflow-y:auto;padding:3px 0;}
+  #feed::-webkit-scrollbar,#top10::-webkit-scrollbar,#topall::-webkit-scrollbar{width:2px;}
+  #feed::-webkit-scrollbar-thumb,#top10::-webkit-scrollbar-thumb,#topall::-webkit-scrollbar-thumb{background:var(--dim);}
+  #feed-filter{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 10px;border-bottom:1px solid var(--dim);
+    background:rgba(0,5,15,0.8);flex-shrink:0;gap:6px;
+  }
+  #feed-filter span{font-size:clamp(7px,0.85vw,8px);color:rgba(160,255,216,0.4);letter-spacing:1px;white-space:nowrap;}
+  .fsort-btn{
+    font-size:clamp(7px,0.85vw,8px);letter-spacing:1px;padding:3px 7px;
+    border:1px solid var(--dim);border-radius:3px;cursor:pointer;
+    background:transparent;color:rgba(160,255,216,0.4);transition:all 0.15s;
+    font-family:"Share Tech Mono",monospace;white-space:nowrap;
+  }
+  .fsort-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,229,200,0.06);}
+  .fsort-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .feed-item{padding:6px 10px 7px;border-bottom:1px solid rgba(0,229,200,0.05);cursor:pointer;}
+  .feed-item{border-left:2px solid transparent;transition:background 0.15s;}
+  .feed-item:hover{background:rgba(0,229,200,0.03);}
+  .page-btn{
+    min-width:26px;height:24px;padding:0 5px;
+    border:1px solid rgba(0,229,200,0.2);border-radius:3px;
+    background:transparent;color:rgba(160,255,216,0.45);
+    font-family:'Share Tech Mono',monospace;font-size:9px;
+    cursor:pointer;transition:all 0.15s;letter-spacing:0.5px;
+  }
+  .page-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(0,229,200,0.06);}
+  .page-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,229,200,0.12);font-weight:bold;}
+  .page-btn:disabled{opacity:0.2;cursor:default;}
+  #feed-info{font-size:8px;color:rgba(160,255,216,0.3);letter-spacing:1px;text-align:center;padding:2px 8px 0;}
+  .feed-ip{font-size:clamp(9px,1.1vw,11px);color:var(--danger);}
+  .feed-meta{font-size:clamp(8px,0.95vw,10px);}
+  .feed-country{color:var(--warn);margin-right:4px;}
+  .feed-count{color:rgba(255,34,68,0.5);}
+  .feed-scenario{font-size:clamp(7px,0.8vw,9px);color:rgba(160,255,216,0.4);margin-top:1px;}
+  .feed-lookup-hint{font-size:11px;opacity:0.25;transition:opacity 0.15s;flex-shrink:0;}
+  .feed-action-btn{
+    flex-shrink:0;
+    border:1px solid rgba(0,229,200,0.2);
+    border-radius:4px;
+    background:rgba(0,20,40,0.6);
+    cursor:pointer;
+    font-size:14px;
+    width:28px; height:28px;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.15s;
+    padding:0;
+    line-height:1;
+  }
+  .feed-lookup-btn{color:#00e5c8;border-color:rgba(0,229,200,0.3);}
+  .feed-lookup-btn:hover{background:rgba(0,229,200,0.15);border-color:var(--accent);box-shadow:0 0 8px rgba(0,229,200,0.3);}
+  .feed-map-btn{color:#ff6a3d;border-color:rgba(255,136,0,0.3);font-size:16px;font-family:monospace;}
+  .feed-map-btn:hover{background:rgba(255,136,0,0.15);border-color:var(--warn);box-shadow:0 0 8px rgba(255,136,0,0.3);}
+  .feed-unban-btn{color:#ffdd00;border-color:rgba(255,220,0,0.3);font-size:13px;}
+  .feed-unban-btn:hover{background:rgba(255,220,0,0.12);border-color:#ffdd00;box-shadow:0 0 8px rgba(255,220,0,0.3);}
+  .feed-unban-btn.success{color:var(--ok);border-color:var(--ok);}
+  .feed-unban-btn.error{color:var(--danger);border-color:var(--danger);}
+  .feed-item:hover .feed-lookup-hint{opacity:0.8;}
+  .feed-item:hover .feed-ip{color:#ff4466;text-shadow:0 0 8px #f85149;}
+  .top-item{padding:5px 10px;border-bottom:1px solid rgba(0,229,200,0.03);display:flex;align-items:center;gap:5px;}
+  .top-rank{font-family:'Orbitron',monospace;font-size:8px;color:rgba(160,255,216,0.3);width:14px;flex-shrink:0;}
+  .top-flag{font-size:13px;}
+  .top-info{flex:1;min-width:0;}
+  .top-country{font-size:clamp(9px,1vw,10px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .top-bar-wrap{margin-top:2px;height:2px;background:rgba(0,229,200,0.07);border-radius:1px;}
+  .top-bar{height:2px;border-radius:1px;}
+  .top-count{font-family:'Orbitron',monospace;font-size:clamp(9px,1vw,10px);color:var(--accent);flex-shrink:0;}
+  #sidebar-bottom{padding:6px 10px;border-top:1px solid var(--dim);font-size:clamp(7px,0.8vw,8px);color:rgba(160,255,216,0.3);letter-spacing:1px;}
+  .wl-ip-privacy{margin:2px 0 4px;}
+  .wl-ip-toggle{
+    display:inline-flex;align-items:center;gap:5px;
+    background:rgba(0,20,40,0.85);border:1px solid var(--dim);
+    border-radius:4px;padding:2px 7px;cursor:pointer;
+    font-family:'Share Tech Mono',monospace;font-size:7px;
+    letter-spacing:0.5px;color:rgba(160,255,216,0.45);
+    transition:all 0.2s;user-select:none;
+  }
+  .wl-ip-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  .wl-ip-toggle.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);}
+  .wl-ip-toggle-dot{width:6px;height:6px;border-radius:50%;background:rgba(160,255,216,0.3);flex-shrink:0;transition:background 0.2s;}
+  .wl-ip-toggle.on .wl-ip-toggle-dot{background:var(--ok);box-shadow:0 0 4px var(--ok);}
+
+  /* FILTER ACTIVE INDICATOR */
+  #filter-bar{display:flex;flex-wrap:wrap;gap:3px;padding:4px 8px;border-bottom:1px solid var(--dim);background:rgba(0,5,15,0.7);min-height:0;flex-shrink:0;}
+  #filter-bar:empty{display:none;}
+  .filter-chip{display:flex;align-items:center;gap:4px;background:rgba(0,229,200,0.08);border:1px solid rgba(0,229,200,0.3);border-radius:10px;padding:2px 8px;font-size:8px;letter-spacing:0.5px;color:var(--accent);cursor:pointer;white-space:nowrap;}
+  .filter-chip:hover{background:rgba(255,34,68,0.1);border-color:var(--danger);color:var(--danger);}
+  .filter-chip-x{font-size:10px;line-height:1;}
+
+  /* SEARCH BOX */
+  #feed-search-wrap{padding:5px 8px;border-bottom:1px solid var(--dim);background:rgba(0,5,15,0.8);flex-shrink:0;}
+  #feed-search{width:100%;background:rgba(0,20,40,0.8);border:1px solid var(--dim);border-radius:3px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:9px;padding:4px 8px;letter-spacing:0.5px;outline:none;transition:border-color 0.15s;}
+  #feed-search:focus{border-color:var(--accent);}
+  #feed-search::placeholder{color:rgba(160,255,216,0.25);}
+
+  /* SPARKLINE */
+  #sparkline-wrap{padding:5px 10px 4px;border-bottom:1px solid var(--dim);background:rgba(0,5,15,0.7);flex-shrink:0;}
+  #sparkline-title{font-size:7px;color:rgba(160,255,216,0.3);letter-spacing:1px;margin-bottom:3px;}
+  #sparkline-svg{width:100%;height:40px;display:block;}
+
+  /* THEME ROW */
+  #theme-row{
+    display:flex;align-items:center;gap:3px;
+    padding:4px 8px;border-bottom:1px solid var(--dim);
+    background:rgba(0,5,15,0.8);flex-shrink:0;flex-wrap:nowrap;overflow:hidden;
+  }
+  #theme-lbl{font-size:7px;color:rgba(160,255,216,0.3);letter-spacing:1px;margin-right:2px;white-space:nowrap;flex-shrink:1;overflow:hidden;transition:opacity 0.2s;}
+  /* "THEME:" Label verschwindet bei schmalem Fenster — via JS ResizeObserver */
+  #theme-lbl.hidden{display:none;}
+  .theme-btn{
+    display:flex;align-items:center;gap:3px;
+    padding:2px 4px;border:1px solid rgba(0,229,200,0.15);border-radius:3px;
+    cursor:pointer;transition:all 0.15s;flex:1;justify-content:center;min-width:0;
+    background:rgba(0,10,25,0.6);overflow:hidden;
+  }
+  .theme-btn:hover{border-color:rgba(0,229,200,0.4);background:rgba(0,229,200,0.05);}
+  .theme-btn.active{border-color:var(--accent);background:rgba(0,229,200,0.08);}
+  .theme-btn span{font-size:clamp(6px,0.85vw,7px);letter-spacing:0px;color:rgba(160,255,216,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .theme-btn.active span{color:var(--accent);}
+  .theme-swatch{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+
+  /* EXPORT + SOUND buttons in sidebar-controls */
+  .ctrl-btn{background:rgba(0,20,40,0.85);border:1px solid var(--dim);border-radius:3px;padding:2px 4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:clamp(6px,0.9vw,8px);color:var(--text);letter-spacing:0px;transition:all 0.2s;white-space:nowrap;opacity:0.7;}
+  .ctrl-btn:hover{border-color:var(--accent);color:var(--accent);opacity:1;}
+  .ctrl-btn.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);opacity:1;}
+
+  /* CLUSTER dots */
+  .cluster-dot{cursor:pointer;}
+
+  /* TOP-ITEM clickable filter */
+  .top-item{cursor:pointer;}
+  .top-item:hover .top-country{color:var(--accent);}
+
+  /* CONTEXT MENU */
+  #ctx-menu{display:none;position:fixed;background:rgba(0,12,30,0.99);border:1px solid var(--accent);border-radius:4px;z-index:9999;overflow:hidden;min-width:160px;box-shadow:0 4px 28px rgba(0,229,200,0.15),0 8px 32px rgba(0,0,0,0.9);}
+  #ctx-title{padding:7px 12px;font-size:9px;letter-spacing:1px;color:var(--accent);border-bottom:1px solid var(--dim);font-family:'Orbitron',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ctx-item{display:flex;align-items:center;gap:7px;padding:8px 12px;font-size:10px;letter-spacing:1px;color:var(--text);cursor:pointer;text-decoration:none;white-space:nowrap;}
+  .ctx-item:hover{background:rgba(0,229,200,0.07);color:var(--accent);}
+  .ctx-icon{font-size:12px;width:14px;text-align:center;}
+  #ctx-close{padding:6px 12px;font-size:9px;color:rgba(160,255,216,0.3);cursor:pointer;border-top:1px solid var(--dim);text-align:center;}
+  #ctx-close:hover{background:rgba(255,34,68,0.07);color:var(--danger);}
+
+  /* TOOLTIP */
+  #tip{display:none;position:fixed;background:rgba(0,12,30,0.97);border:1px solid rgba(0,229,200,0.25);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:9px 28px 9px 12px;border-radius:4px;pointer-events:none;z-index:800;line-height:1.6;min-width:180px;max-width:240px;box-shadow:0 4px 20px rgba(0,0,0,0.7);}
+  #tip.tip-pinned{pointer-events:auto;border-color:var(--accent);}
+  #tip-close{display:none;position:absolute;top:5px;right:6px;width:18px;height:18px;padding:0;border:none;background:rgba(255,34,68,0.15);color:var(--danger);border-radius:3px;cursor:pointer;font-size:11px;line-height:18px;text-align:center;font-family:inherit;}
+  #tip-close:hover{background:rgba(255,34,68,0.35);}
+  #tip.tip-pinned #tip-close{display:block;}
+  .city-map-label{pointer-events:none;opacity:0.85;}
+
+  /* MOBILE BOTTOM SHEET */
+  #mob-sheet{
+    display:none;position:fixed;bottom:0;left:0;right:0;
+    background:var(--bg);border-top:2px solid rgba(0,229,200,0.25);
+    z-index:320;flex-direction:column;
+    box-shadow:0 -8px 24px rgba(0,0,0,0.55);
+  }
+  #mob-data-panel{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
+  #mob-tab-btns{
+    display:flex;align-items:stretch;min-height:40px;flex-shrink:0;
+    background:rgba(0,5,15,0.95);border-bottom:1px solid var(--dim);
+  }
+  #map-mob-controls{display:none;}
+  .mob-tab-btn{
+    flex:1;min-width:72px;max-width:33%;
+    display:flex;align-items:center;justify-content:center;
+    padding:10px 6px;text-align:center;
+    font-size:10px;letter-spacing:0.8px;line-height:1.2;
+    color:rgba(160,255,216,0.45);cursor:pointer;
+    border:none;border-bottom:3px solid transparent;
+    background:transparent;white-space:nowrap;
+    font-family:'Share Tech Mono',monospace;
+  }
+  .mob-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(0,229,200,0.06);}
+  #map-mob-controls .mob-ctrl-pill{flex-shrink:0;}
+  #mob-legend-bar{display:none;}
+  .mob-legend-strip{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;}
+  #mob-gesamt-bar{
+    flex-shrink:0;padding:6px 8px 4px;
+    border-bottom:1px solid rgba(0,229,200,0.1);
+    background:rgba(0,5,15,0.96);
+  }
+  #mob-gesamt-bar .mob-stats-alltime{margin-bottom:4px;}
+  .mob-stats-grid{display:flex;flex-direction:column;gap:5px;}
+  .mob-stats-block{border:1px solid rgba(0,229,200,0.08);border-radius:4px;padding:4px 6px;background:rgba(0,12,24,0.5);}
+  .mob-stats-block.mob-stats-alltime{border-color:rgba(160,255,216,0.12);background:rgba(0,8,18,0.55);}
+  .mob-stats-block-title{font-size:6px;letter-spacing:1px;color:rgba(160,255,216,0.45);margin-bottom:3px;}
+  .mob-stats-items{display:flex;justify-content:space-around;gap:4px;flex-wrap:wrap;}
+  .mob-stat-item{display:flex;flex-direction:column;align-items:center;min-width:42px;}
+  .mob-stat-val{font-family:'Orbitron',monospace;font-size:10px;font-weight:700;color:var(--accent);line-height:1.1;}
+  .mob-stat-lbl{font-size:5px;color:rgba(160,255,216,0.4);letter-spacing:0.5px;text-align:center;}
+  .mob-stat-dot{font-size:7px;line-height:1;margin-bottom:1px;}
+  .mob-stats-meta{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;}
+  .mob-stats-meta-left{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;}
+  .mob-stats-meta-right{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+  .mob-ctrl-pill{
+    display:flex;align-items:center;gap:3px;border-radius:3px;padding:2px 5px;cursor:pointer;
+    font-family:'Share Tech Mono',monospace;font-size:7px;white-space:nowrap;user-select:none;
+    border:1px solid rgba(0,229,200,0.2);color:rgba(160,255,216,0.45);background:transparent;
+  }
+  .mob-ctrl-pill.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);}
+  .mob-ctrl-pill-dot{width:5px;height:5px;border-radius:50%;background:rgba(160,255,216,0.3);flex-shrink:0;}
+  .mob-ctrl-pill.on .mob-ctrl-pill-dot{background:var(--ok);box-shadow:0 0 4px var(--ok);}
+  .mob-theme-dot{transition:all 0.15s;}
+  .mob-theme-dot.active{border-color:#fff !important;transform:scale(1.25);}
+  #mob-panel{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  .mob-panel-view{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;}
+  .mob-panel-view.active{display:flex;}
+  .mob-panel-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .mob-panel-scroll::-webkit-scrollbar{width:3px;}
+  .mob-panel-scroll::-webkit-scrollbar-thumb{background:var(--dim);}
+  #mob-feed,#mob-top10,#mob-topall{padding:2px 0;}
+  #mob-top10 .top-item,#mob-topall .top-item{padding:8px 10px;}
+  .mob-panel-tab-hdr{
+    flex-shrink:0;padding:6px 10px;font-size:8px;letter-spacing:1px;
+    color:var(--accent);border-bottom:1px solid var(--dim);
+    background:rgba(0,5,15,0.9);
+  }
+
+  /* LOADING */
+  #loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:500;gap:14px;font-family:'Orbitron',monospace;}
+  #loading h2{font-size:clamp(11px,2vw,13px);letter-spacing:4px;color:var(--accent);}
+  #loading p{font-size:10px;color:rgba(160,255,216,0.4);}
+  .loader{width:40px;height:40px;border:2px solid var(--dim);border-top:2px solid var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #err{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(255,34,68,0.1);border:1px solid var(--danger);color:var(--danger);padding:7px 14px;font-size:10px;z-index:400;letter-spacing:1px;border-radius:2px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* Responsive — Handy + Tablet Hochformat (≤900px): Bottom-Sheet statt Sidebar */
+  @media(max-width:900px){
+    #sidebar{display:none!important;}
+    #mob-sheet{display:flex!important;flex-direction:column;}
+    #layout{top:0!important;}
+    html,body{background:var(--bg)!important;}
+    #grid-bg{display:block;}
+    #map-title-overlay{right:0;left:0;height:22px;padding:0 8px;}
+    #map-title-overlay #h-title{font-size:8px;letter-spacing:1px;}
+    #map-version-badge{font-size:6px;padding:1px 3px;}
+    #mob-sheet{
+      position:fixed;bottom:0;left:0;right:0;
+      height:min(52vh,420px);max-height:min(55vh,440px);min-height:240px;
+    }
+    #map-mob-controls{
+      display:flex;align-items:center;justify-content:center;gap:6px;
+      padding:5px 8px;border-bottom:1px solid var(--dim);
+      background:rgba(0,5,15,0.92);flex-shrink:0;flex-wrap:wrap;
+    }
+    #map-window-stats{display:block!important;order:0;}
+    #map-mob-controls{order:1;}
+    #console-controls{order:2;}
+    #mob-gesamt-bar .mob-stats-meta{display:flex;padding-top:2px;}
+    #mob-view-top10 .mob-panel-scroll,#mob-view-topall .mob-panel-scroll{flex:1;min-height:140px;}
+    #mob-feed .feed-item{padding:5px 8px 6px;}
+    #mob-feed .feed-action-btn{width:24px;height:24px;font-size:12px;}
+    #mob-feed .feed-ip{font-size:10px;}
+    #mob-top10 .top-item,#mob-topall .top-item{padding:7px 10px;}
+    .mob-tab-btn{font-size:8px;min-height:34px;padding:6px 4px;}
+    #mob-gesamt-bar{padding:4px 6px 3px;}
+    #mob-gesamt-bar .mob-stats-block{padding:3px 5px;}
+    .mob-stat-val{font-size:8px;}
+    #mob-panel{flex:1!important;min-height:0;max-height:none!important;}
+    #map-col{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+    #map-wrap{flex:1 1 0;min-height:0;}
+    #map-console-bar{
+      font-size:8px;flex:0 0 auto;overflow:visible;
+      padding-bottom:1px;
+    }
+    #mob-sheet{z-index:320;}
+    #timeline-wrap{padding:2px 8px 0;flex-shrink:0;}
+    #timeline-labels{display:none;}
+    #map-window-stats{padding:2px 6px 1px;}
+    .map-window-stats-title{font-size:5px;margin-bottom:1px;}
+    .map-window-stats-title::before{display:none;}
+    .map-window-stats-grid{gap:0;}
+    .mws-val{font-size:7px;}
+    .mws-lbl{font-size:3.5px;}
+    #map-mob-controls{
+      padding:2px 6px;gap:3px;
+      justify-content:center;
+    }
+    #map-mob-controls .mob-ctrl-pill{padding:1px 4px;font-size:5.5px;}
+    #mob-legend-bar{
+      display:block;padding:2px 6px 3px;
+      border-top:1px solid rgba(0,229,200,0.08);
+      border-bottom:1px solid rgba(0,229,200,0.06);
+      background:rgba(0,5,15,0.85);flex-shrink:0;
+    }
+    #mob-legend-bar .threat-leg{font-size:5px;gap:2px;color:rgba(160,255,216,0.55);}
+    #mob-legend-bar .threat-leg-dot{
+      width:7px;height:7px;border-radius:2px;flex-shrink:0;
+      display:inline-block;
+    }
+    #mob-legend-bar .mob-legend-strip{gap:3px 5px;justify-content:center;}
+    #console-controls{
+      display:flex;flex-direction:column;gap:2px;
+      padding:2px 6px 3px;flex-shrink:0;
+    }
+    #console-controls .console-legend-row{display:none!important;}
+    #console-controls .console-range-row{order:1;}
+    #console-controls .console-speed-row{order:2;}
+    #console-controls .console-row{
+      flex-direction:row;align-items:center;gap:3px;
+    }
+    #console-controls .ctrl-group-lbl{
+      width:40px;flex-shrink:0;font-size:5.5px;letter-spacing:0.2px;
+      color:var(--accent);line-height:1.1;padding:0;
+    }
+    #console-controls .ctrl-chip-strip{
+      flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px;
+      align-content:flex-start;
+    }
+    #console-controls .pill-btn{
+      padding:1px 3px;font-size:5px;min-height:14px;line-height:1;
+      border-radius:2px;
+    }
+    #replay-bar{
+      padding:4px 10px;gap:5px;
+      max-width:min(calc(100% - 16px),340px);
+      bottom:10px;
+    }
+    .replay-ctrl-btn{width:26px;height:26px;}
+    #replay-clock{font-size:7px;min-width:0;flex:1;max-width:200px;overflow:hidden;text-overflow:ellipsis;}
+    #mode-live-btn{font-size:7px;padding:2px 8px;}
+    #zoom-ctrl{bottom:auto;top:26px;left:6px;}
+    #zoom-level{left:44px;top:26px;bottom:auto;font-size:7px;}
+    #zoom-prefs-panel{bottom:auto;top:60px;left:6px;max-width:calc(100vw - 12px);}
+    .zoom-btn{width:28px;height:28px;font-size:14px;}
+  }
+  @media(max-width:480px){
+    #mob-sheet{height:min(54vh,380px);max-height:min(58vh,400px);}
+    #console-controls .ctrl-group-lbl{width:42px;font-size:5.5px;}
+    #console-controls .pill-btn{font-size:5px;min-height:15px;padding:2px 3px;}
+    #replay-bar{max-width:calc(100% - 12px);}
+    #replay-clock{display:none;}
+    #mode-live-btn{margin-left:auto;}
+  }
+  /* Tablet Querformat / kleines Desktop-Fenster */
+  @media(min-width:901px) and (max-width:1200px){
+    #sidebar{width:clamp(170px,22vw,220px);}
+    #sidebar-stats{padding:4px 8px;}
+    .stat-val{font-size:clamp(9px,1.1vw,12px);}
+    #toggle-row{flex-wrap:wrap;gap:4px;}
+    #theme-row{flex-wrap:wrap;}
+    #map-console-bar{font-size:8px;}
+    .ctrl-speed .pill-btn,.ctrl-range .pill-btn{padding:2px 5px;font-size:6px;}
+    #footer-stats{gap:8px;padding:4px 8px;flex-wrap:wrap;}
+    .fstat{font-size:8px;}
+    #map-panels-left{max-width:175px;}
+    .map-panel{min-width:118px;max-width:168px;font-size:8px;padding:6px 8px;}
+    #feed-search{font-size:9px;}
+    .feed-item{padding:6px 8px;}
+  }
+  @media(max-height:500px) and (orientation:landscape){
+    #mob-sheet{display:none!important;}
+    #sidebar{display:flex!important;}
+    #layout{bottom:0!important;}
+    #map-panels-left{display:none;}
+    #map-window-stats{display:block!important;}
+  }
+</style>
+</head>
+<body>
+<div id="grid-bg"></div>
+<div id="loading"><div class="loader"></div><h2 id="load-title">INITIALIZING</h2><p id="ls">CONNECTING...</p></div>
+<div id="err"></div>
+
+<div id="settings-modal" class="settings-modal hidden" aria-hidden="true">
+  <div class="settings-backdrop" onclick="closeSettingsModal()"></div>
+  <div class="settings-panel" role="dialog" aria-labelledby="settings-title">
+    <header>
+      <h3 id="settings-title">Einstellungen</h3>
+      <button type="button" id="settings-close-btn" onclick="closeSettingsModal()" aria-label="Schließen">✕</button>
+    </header>
+    <div class="settings-nav">
+      <button type="button" data-settings-jump="settings-sec-perf">Leistung</button>
+      <button type="button" data-settings-jump="settings-sec-anim">Animation</button>
+      <button type="button" data-settings-jump="settings-sec-rockets">Raketen</button>
+      <button type="button" data-settings-jump="settings-sec-map">Karte</button>
+    </div>
+    <div class="settings-help" id="settings-help-box">Tipp: In jedem Bereich auf einen Wert klicken, dann erscheint hier die Erklärung.</div>
+    <div class="settings-body">
+      <section id="settings-sec-perf-block">
+        <h4 id="settings-sec-perf">Leistung &amp; Daten</h4>
+        <label class="settings-field"><span id="set-lbl-refresh">Feed aktualisieren (Sek.)</span><input type="number" id="set-refresh-sec" min="5" max="120" step="1"></label>
+        <label class="settings-field"><span id="set-lbl-max-active">Max. Raketen gleichzeitig</span><input type="number" id="set-max-active" min="5" step="1"></label>
+        <label class="settings-field"><span id="set-lbl-max-pending">Max. Warteschlange</span><input type="number" id="set-max-pending" min="10" step="10"></label>
+        <label class="settings-field"><span id="set-lbl-max-batch">Raketen pro Schwung</span><input type="number" id="set-max-batch" min="3" step="1"></label>
+        <label class="settings-field"><span id="set-lbl-preset">Voreinstellung</span>
+          <select id="set-performance-preset">
+            <option value="">— auswählen —</option>
+            <option value="balanced">Balanced</option>
+            <option value="performance">Performance</option>
+            <option value="quality">Qualität</option>
+            <option value="ultra">Ultra (High-End)</option>
+          </select>
+        </label>
+        <p class="settings-hint" id="settings-preset-hint">Presets setzen nur Leistungswerte und können danach fein angepasst werden.</p>
+      </section>
+      <section id="settings-sec-anim-block">
+        <h4 id="settings-sec-anim">Animation</h4>
+        <label class="settings-field"><span id="set-lbl-duration">Flugdauer (Sek.)</span><input type="number" id="set-duration-sec" min="1" max="20" step="0.5"></label>
+        <label class="settings-field"><span id="set-lbl-stagger">Abstand gleiche IP (ms)</span><input type="number" id="set-stagger-ms" min="50" max="5000" step="50"></label>
+        <label class="settings-field"><span id="set-lbl-ui-throttle">Karten-Update Replay (ms)</span><input type="number" id="set-ui-throttle" min="80" max="1000" step="20"></label>
+        <label class="settings-field"><span id="set-lbl-label-throttle">Flight-Labels (ms)</span><input type="number" id="set-label-throttle" min="50" max="500" step="10"></label>
+        <label class="settings-field"><span id="set-lbl-replay-min">Replay-Dauer bei 1× (Min.)</span><input type="number" id="set-replay-min" min="1" max="30" step="0.5"></label>
+      </section>
+      <section id="settings-sec-rockets-block">
+        <h4 id="settings-sec-rockets">Raketen-Logik</h4>
+        <label class="settings-field"><span id="set-lbl-spawn-mode">Rakete auslösen pro</span>
+          <select id="set-spawn-mode">
+            <option value="per_attack">Angriff (IP + Szenario + Zeit)</option>
+            <option value="per_ip_time">IP + Zeitstempel</option>
+            <option value="per_ip">nur IP (ein Flug pro IP)</option>
+          </select>
+        </label>
+        <p class="settings-hint" id="settings-spawn-hint">Jeder Feed-Eintrag = eigene Rakete (Standard).</p>
+        <label class="settings-field"><span id="set-lbl-queue-ip">Max. Warteschlange pro IP</span><input type="number" id="set-queue-ip" min="1" max="50" step="1"></label>
+        <label class="settings-field"><span id="set-lbl-rocket-style">Raketen-Stil</span>
+          <select id="set-rocket-style">
+            <option value="classic">Neu (Schweif + Verlauf)</option>
+            <option value="arc">Console (gestrichelte Bögen)</option>
+            <option value="legacy">Minimal (kurzer Strich)</option>
+          </select>
+        </label>
+        <label class="settings-field"><span id="set-lbl-tail">Schweif-Länge Neu (%)</span><input type="number" id="set-tail-classic" min="4" max="25" step="1"></label>
+        <label class="settings-field"><span id="set-lbl-lane">Bahn-Abstand (px)</span><input type="number" id="set-lane-spread" min="0" max="30" step="1"></label>
+        <label class="settings-field"><span id="set-lbl-max-arcs">Max. Console-Bögen</span><input type="number" id="set-max-arcs" min="10" max="500" step="10"></label>
+        <label class="settings-check"><input type="checkbox" id="set-show-labels"> <span id="set-lbl-show-labels">Flight-Labels anzeigen</span></label>
+        <label class="settings-field"><span id="set-lbl-max-labels">Max. Flight-Labels</span><input type="number" id="set-max-labels" min="0" max="30" step="1"></label>
+      </section>
+      <section id="settings-sec-map-block">
+        <h4 id="settings-sec-map">Karte / Server</h4>
+        <label class="settings-check"><input type="checkbox" id="set-override-coords"> <span id="set-lbl-override">Eigene Koordinaten (überschreibt Docker)</span></label>
+        <label class="settings-field"><span id="set-lbl-lat">Breitengrad (LAT)</span><input type="text" id="set-server-lat" inputmode="decimal" placeholder="53.55"></label>
+        <label class="settings-field"><span id="set-lbl-lon">Längengrad (LON)</span><input type="text" id="set-server-lon" inputmode="decimal" placeholder="10.00"></label>
+        <label class="settings-field"><span id="set-lbl-name">Anzeigename</span><input type="text" id="set-server-name" maxlength="32" placeholder="Home"></label>
+        <p class="settings-hint" id="settings-coords-hint">Docker-Werte werden beim Start von /config geladen.</p>
+      </section>
+    </div>
+    <footer>
+      <button type="button" id="settings-reset-btn" onclick="resetMapSettings()">Standard</button>
+      <button type="button" id="settings-cancel-btn" onclick="closeSettingsModal()">Abbrechen</button>
+      <button type="button" id="settings-save-btn" class="primary" onclick="saveSettingsFromForm()">Speichern</button>
+    </footer>
+  </div>
+</div>
+
+<div id="ctx-menu">
+  <div id="ctx-title">IP</div>
+  <a class="ctx-item" id="c-cti"    target="_blank"><span class="ctx-icon">🛡</span>CrowdSec CTI</a>
+  <a class="ctx-item" id="c-shodan" target="_blank"><span class="ctx-icon">🔍</span>Shodan</a>
+  <a class="ctx-item" id="c-censys" target="_blank"><span class="ctx-icon">🌐</span>Censys</a>
+  <a class="ctx-item" id="c-ripe"   target="_blank"><span class="ctx-icon">📋</span>RIPE</a>
+  <a class="ctx-item" id="c-ripes"  target="_blank"><span class="ctx-icon">📊</span>RIPEstat</a>
+  <a class="ctx-item" id="c-crim"   target="_blank"><span class="ctx-icon">⚠️</span>Criminal IP</a>
+  <div id="ctx-close">✕ SCHLIESSEN</div>
+</div>
+<div id="tip"><button type="button" id="tip-close" title="Close" aria-label="Close">✕</button><div id="tip-content"></div></div>
+
+<!-- MOBILE HEADER (kept for CSS, IDs moved to mob-sheet) -->
+<header id="mob-header" class="mob-header" style="display:none!important;"></header>
+
+<div id="layout">
+  <div id="map-col">
+    <div id="map-wrap">
+      <div id="map-title-overlay">
+        <span id="h-title">Self<span>ThreatMap</span></span>
+        <span id="map-version-badge">v2.0.0</span>
+      </div>
+      <svg id="base-svg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
+      <canvas id="arc-canvas"></canvas>
+      <div id="flight-labels-layer"></div>
+      <div id="map-panels-left">
+        <div id="panel-scenarios" class="map-panel"><h4 id="lbl-top-scenarios">TOP SCENARIOS</h4><div id="panel-scenarios-body"></div></div>
+        <div id="panel-ips" class="map-panel"><h4 id="lbl-malevolent-ips">MALEVOLENT IPS</h4><div id="panel-ips-body"></div></div>
+        <div id="panel-origins" class="map-panel"><h4 id="lbl-top-origins">TOP ATTACK ORIGINS</h4><div id="panel-origins-body"></div></div>
+      </div>
+      <div id="replay-bar" class="is-replay">
+        <button type="button" id="replay-play-btn" class="replay-ctrl-btn" title="Wiedergabe starten" aria-label="Play"></button>
+        <button type="button" id="replay-stop-btn" class="replay-ctrl-btn" title="Wiedergabe stoppen" aria-label="Stop"></button>
+        <span id="replay-clock">—</span>
+        <button type="button" id="mode-live-btn" title="Live-Feed (Echtzeit)">LIVE</button>
+      </div>
+      <div id="zoom-ctrl">
+        <div class="zoom-btn" id="bzi">+</div>
+        <div class="zoom-btn" id="bzo">−</div>
+        <div class="zoom-btn" id="bzr" style="font-size:12px">⌂</div>
+        <div class="zoom-btn" id="bzp" style="font-size:11px" title="Karten-Zoom speichern">💾</div>
+      </div>
+      <div id="zoom-prefs-panel" aria-hidden="true">
+        <label><input type="checkbox" id="zoom-prefs-use-saved"> <span id="zoom-prefs-use-lbl">Beim Laden gespeicherte Ansicht</span></label>
+        <div class="zoom-prefs-row">
+          <button type="button" class="zoom-prefs-btn" id="zoom-prefs-save">Ansicht speichern</button>
+          <button type="button" class="zoom-prefs-btn" id="zoom-prefs-reset">Zurücksetzen</button>
+        </div>
+        <div>
+          <span id="zoom-prefs-home-lbl">Standard-Zoom (⌂):</span>
+          <input type="range" id="zoom-prefs-home-k" min="0.5" max="8" step="0.1" value="1.1">
+          <span id="zoom-prefs-home-val">1.1×</span>
+        </div>
+        <div id="zoom-prefs-status">—</div>
+      </div>
+      <div id="zoom-level">ZOOM 1×</div>
+    </div>
+    <div id="map-console-bar">
+      <div id="timeline-wrap"><input type="range" id="replay-slider" min="0" max="1000" value="0"></div>
+      <div id="timeline-labels"><span id="tl-start">—</span><span id="tl-end">—</span></div>
+      <div id="map-window-stats">
+        <div class="map-window-stats-title" id="mws-title-lbl">ZEITFENSTER · KARTE</div>
+        <div class="map-window-stats-grid">
+          <div class="mws-item"><span class="mws-val" id="mws-alerts">—</span><span class="mws-lbl" id="mws-alerts-lbl">MELDUNGEN</span></div>
+          <div class="mws-item"><span class="mws-val" id="mws-ips">—</span><span class="mws-lbl" id="mws-ips-lbl">IPS</span></div>
+          <div class="mws-item"><span class="mws-val" id="mws-scenarios">—</span><span class="mws-lbl" id="mws-scn-lbl">SZENARIEN</span></div>
+          <div class="mws-item"><span class="mws-val" id="mws-countries">—</span><span class="mws-lbl" id="mws-ctry-lbl">LÄNDER</span></div>
+        </div>
+      </div>
+      <div id="map-mob-controls" aria-label="Karten-Steuerung">
+        <div id="mob-lines-toggle" class="mob-ctrl-pill on" onclick="toggleLines()">
+          <div id="mob-lines-dot" class="mob-ctrl-pill-dot"></div>
+          <span id="mob-lines-label">ANGRIFFE</span>
+        </div>
+        <div id="mob-anim-toggle" class="mob-ctrl-pill on" onclick="toggleAnim()">
+          <div id="mob-anim-dot" class="mob-ctrl-pill-dot"></div>
+          <span id="mob-anim-label">ANIMATION</span>
+        </div>
+        <div id="mob-autozoom-toggle" class="mob-ctrl-pill off" onclick="toggleAutoZoom()">
+          <div id="mob-autozoom-dot" class="mob-ctrl-pill-dot"></div>
+          <span id="mob-autozoom-label">AUTO-ZOOM</span>
+        </div>
+        <button type="button" id="settings-open-btn-mob" class="settings-open-btn" onclick="openSettingsModal()" title="Einstellungen">⚙</button>
+      </div>
+      <div id="mob-legend-bar" class="mob-legend-bar" aria-label="Legende">
+        <div id="threat-legend-mob" class="mob-legend-strip"></div>
+      </div>
+      <div id="console-controls">
+        <div class="console-row console-speed-row">
+          <span class="ctrl-group-lbl" id="lbl-speed">SPEED</span>
+          <div class="ctrl-chip-strip ctrl-speed-strip">
+            <button type="button" class="pill-btn" data-speed="0.25">0.25×</button>
+            <button type="button" class="pill-btn" data-speed="0.5">0.5×</button>
+            <button type="button" class="pill-btn active" data-speed="1">1×</button>
+            <button type="button" class="pill-btn" data-speed="1.5">1.5×</button>
+            <button type="button" class="pill-btn" data-speed="2">2×</button>
+            <button type="button" class="pill-btn" data-speed="3">3×</button>
+            <button type="button" class="pill-btn" data-speed="4">4×</button>
+          </div>
+        </div>
+        <div class="console-row console-range-row">
+          <span class="ctrl-group-lbl" id="lbl-range">RANGE</span>
+          <div class="ctrl-chip-strip ctrl-range-strip">
+            <button type="button" class="pill-btn" data-range="24">24H</button>
+            <button type="button" class="pill-btn active" data-range="48">48H</button>
+            <button type="button" class="pill-btn" data-range="168">7T</button>
+            <button type="button" class="pill-btn" data-range="720">1M</button>
+            <button type="button" class="pill-btn" data-range="4320">6M</button>
+            <button type="button" class="pill-btn" data-range="8760">12M</button>
+            <button type="button" class="pill-btn" data-range="17520">2J</button>
+            <button type="button" class="pill-btn" data-range="26280">3J</button>
+            <button type="button" class="pill-btn" data-range="35040">4J</button>
+            <button type="button" class="pill-btn" data-range="43800">5J</button>
+            <button type="button" class="pill-btn" data-range="52560">6J</button>
+          </div>
+        </div>
+        <div class="console-row console-legend-row">
+          <div id="threat-legend" class="ctrl-chip-strip console-legend-strip"></div>
+        </div>
+      </div>
+      <div id="footer-stats">
+        <div class="fstat"><span>🔴</span><span class="fstat-val" id="fs-alerts">—</span><span class="fstat-lbl" id="fs-alerts-lbl">ALERTS</span></div>
+        <div class="fstat"><span>🟡</span><span class="fstat-val" id="fs-ips">—</span><span class="fstat-lbl" id="fs-ips-lbl">UNIQUE IPS</span></div>
+        <div class="fstat"><span>🔵</span><span class="fstat-val" id="fs-scenarios">—</span><span class="fstat-lbl" id="fs-scn-lbl">SCENARIOS</span></div>
+        <div class="fstat"><span>🟢</span><span class="fstat-val" id="fs-countries">—</span><span class="fstat-lbl" id="fs-ctry-lbl">COUNTRIES</span></div>
+      </div>
+    </div>
+  </div>
+
+  <aside id="sidebar">
+    <!-- Sidebar top toolbar: stats + controls -->
+    <div id="sidebar-toolbar">
+      <div id="sidebar-stats">
+        <div class="sb-stat">
+          <span class="stat-val" id="s-total">—</span>
+          <span class="stat-lbl" id="s-attacks-lbl">ANGRIFFE</span>
+        </div>
+        <div class="sb-stat">
+          <span class="stat-val" id="s-countries">—</span>
+          <span class="stat-lbl" id="s-countries-lbl">LÄNDER</span>
+        </div>
+        <div class="sb-stat" id="s-scenarios-wrap">
+          <span class="stat-val" id="s-scenarios">—</span>
+          <span class="stat-lbl" id="s-scenarios-lbl">SZENARIEN</span>
+        </div>
+        <div class="sb-stat"><span class="stat-val blink" style="color:var(--ok)">●</span><span class="stat-lbl" id="s-live-lbl">LIVE</span></div>
+      </div>
+      <div id="toggle-row">
+        <div id="anim-toggle" onclick="toggleAnim()" title="Animierte Karte (Replay/Live) vs. statische Heatmap" class="on">
+          <div id="anim-dot"></div>
+          <span id="anim-label">ANIMATION</span>
+        </div>
+        <div id="lines-toggle" onclick="toggleLines()" title="Angriffe auf der Karte ein/aus" class="on">
+          <div id="lines-dot"></div>
+          <span id="lines-label">ANGRIFFE</span>
+        </div>
+        <div id="autozoom-toggle" class="off" onclick="toggleAutoZoom()" title="Bei Angriff automatisch in die Region zoomen" aria-pressed="false">
+          <div id="autozoom-dot"></div>
+          <span id="autozoom-label">AUTO-ZOOM AUS</span>
+        </div>
+      </div>
+      <!-- Theme row: separate line below controls -->
+      <div id="theme-row">
+        <span id="theme-lbl">THEME:</span>
+        <div class="theme-btn active" id="theme-cyan" onclick="setTheme('cyan')"><div class="theme-swatch" style="background:#00e5c8;"></div><span>CYAN</span></div>
+        <div class="theme-btn" id="theme-red" onclick="setTheme('red')"><div class="theme-swatch" style="background:#f85149;"></div><span>ALARM</span></div>
+        <div class="theme-btn" id="theme-matrix" onclick="setTheme('matrix')"><div class="theme-swatch" style="background:#3fb950;"></div><span>MATRIX</span></div>
+        <div class="theme-btn" id="theme-amber" onclick="setTheme('amber')"><div class="theme-swatch" style="background:#ffaa00;"></div><span>AMBER</span></div>
+        <button type="button" id="settings-open-btn" class="settings-open-btn" onclick="openSettingsModal()" title="Einstellungen">⚙ <span id="settings-open-lbl">EINST.</span></button>
+      </div>
+    </div>
+    <div id="tabs">
+      <div class="tab active" data-tab="feed">▶ FEED</div>
+      <div class="tab" data-tab="top10">🏆 TOP 10</div>
+      <div class="tab" data-tab="topall">🌍 ALLE</div>
+    </div>
+    <div class="tab-content active" id="tc-feed">
+      <!-- Sparkline -->
+      <div id="sparkline-wrap">
+        <div id="sparkline-title">ANGRIFFE / STUNDE</div>
+        <svg id="sparkline-svg"></svg>
+      </div>
+      <!-- Active filter chips -->
+      <div id="filter-bar"></div>
+      <!-- Search -->
+      <div id="feed-search-wrap">
+        <input id="feed-search" type="text" placeholder="🔍  IP, LAND, SZENARIO..." oninput="onFeedSearch()">
+      </div>
+      <div id="feed-filter">
+        <span class="sort-lbl">SORTIERUNG:</span>
+        <div style="display:flex;gap:4px;">
+          <button class="fsort-btn active" id="fsort-new" onclick="setFeedSort('newest')">▼ NEUESTE</button>
+          <button class="fsort-btn" id="fsort-old" onclick="setFeedSort('oldest')">▲ ÄLTESTE</button>
+        </div>
+        <button class="ctrl-btn csv-feed-btn" onclick="exportCSV()" title="Feed als CSV exportieren">↓ CSV</button>
+      </div>
+      <div id="feed"></div>
+      <div id="feed-info"></div>
+      <div id="feed-pages-wrap">
+        <div id="feed-pages"></div>
+      </div>
+    </div>
+    <div class="tab-content" id="tc-top10"><div id="top10"></div></div>
+    <div class="tab-content" id="tc-topall"><div id="topall"></div></div>
+    <div id="sidebar-bottom"><span id="sidebar-server-lbl">MEIN-SERVER</span> &nbsp;|&nbsp; <span id="lu">—</span><br>
+      <div id="wl-badge" style="margin:4px 0 3px;display:flex;align-items:center;gap:5px;font-size:8px;letter-spacing:0.5px;">
+        <span id="wl-dot" style="width:6px;height:6px;border-radius:50%;background:rgba(160,255,216,0.2);flex-shrink:0;display:inline-block;"></span>
+        <span id="wl-text" style="color:rgba(160,255,216,0.3);">Whitelist: —</span>
+      </div>
+      <div class="wl-ip-privacy">
+        <button type="button" id="wl-ip-toggle" class="wl-ip-toggle on" aria-pressed="true" title="Eigene IP in der Ecke ein-/ausblenden">
+          <span class="wl-ip-toggle-dot"></span>
+          <span class="wl-ip-toggle-lbl">EIGENE IP AN</span>
+        </button>
+      </div>
+      <a href="https://github.com/s3lfcod3r/selfthreatmap" target="_blank" style="color:rgba(0,229,200,0.35);font-size:8px;text-decoration:none;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='rgba(0,229,200,0.35)'">⭐ GitHub: s3lfcod3r/selfthreatmap</a></div>
+  </aside>
+</div>
+
+<div id="mob-sheet">
+  <div id="mob-data-panel">
+  <div id="mob-gesamt-bar">
+    <div class="mob-stats-block mob-stats-alltime">
+      <div class="mob-stats-block-title" id="mob-lbl-alltime">GESAMT (ALLTIME)</div>
+      <div class="mob-stats-items">
+        <div class="mob-stat-item"><span class="mob-stat-val" id="mob-s-total">—</span><span class="mob-stat-lbl" id="mob-attacks-lbl">ANGRIFFE</span></div>
+        <div class="mob-stat-item"><span class="mob-stat-val" id="mob-s-countries">—</span><span class="mob-stat-lbl" id="mob-countries-lbl">LÄNDER</span></div>
+        <div class="mob-stat-item"><span class="mob-stat-val" id="mob-s-scenarios">—</span><span class="mob-stat-lbl" id="mob-scenarios-lbl">SZENARIEN</span></div>
+      </div>
+    </div>
+    <div class="mob-stats-meta">
+      <div class="mob-stats-meta-left">
+        <span class="mob-stat-val blink" style="color:var(--ok);font-size:9px;">●</span>
+        <span class="mob-stat-lbl" id="mob-live-lbl">LIVE</span>
+        <span class="mob-stat-lbl"><span id="mob-lu">—</span></span>
+        <div id="mob-wl-badge" style="display:flex;align-items:center;gap:3px;" title="Whitelist Status">
+          <span id="mob-wl-dot" style="width:6px;height:6px;border-radius:50%;background:rgba(160,255,216,0.2);flex-shrink:0;"></span>
+          <span id="mob-wl-text" style="font-size:7px;color:rgba(160,255,216,0.3);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">🛡️ —</span>
+        </div>
+        <button type="button" id="mob-wl-ip-toggle" class="wl-ip-toggle on" aria-pressed="true">
+          <span class="wl-ip-toggle-dot"></span>
+          <span class="wl-ip-toggle-lbl">IP AN</span>
+        </button>
+      </div>
+      <div class="mob-stats-meta-right">
+        <div class="mob-theme-dot" onclick="setTheme('cyan')" id="mob-t-cyan" style="width:9px;height:9px;border-radius:50%;background:#00e5c8;cursor:pointer;border:1px solid transparent;"></div>
+        <div class="mob-theme-dot" onclick="setTheme('red')" id="mob-t-red" style="width:9px;height:9px;border-radius:50%;background:#f85149;cursor:pointer;border:1px solid transparent;"></div>
+        <div class="mob-theme-dot" onclick="setTheme('matrix')" id="mob-t-matrix" style="width:9px;height:9px;border-radius:50%;background:#3fb950;cursor:pointer;border:1px solid transparent;"></div>
+        <div class="mob-theme-dot" onclick="setTheme('amber')" id="mob-t-amber" style="width:9px;height:9px;border-radius:50%;background:#ffaa00;cursor:pointer;border:1px solid transparent;"></div>
+        <button class="ctrl-btn csv-feed-btn" onclick="exportCSV()" style="padding:2px 5px;font-size:8px;">↓ CSV</button>
+        <a href="https://github.com/s3lfcod3r/selfthreatmap" target="_blank" style="color:rgba(0,229,200,0.4);font-size:8px;text-decoration:none;">⭐</a>
+      </div>
+    </div>
+  </div>
+  <nav id="mob-tab-btns" aria-label="Feed navigation">
+    <button type="button" class="mob-tab-btn active" data-mob="feed">▶ FEED</button>
+    <button type="button" class="mob-tab-btn" data-mob="top10">🏆 TOP 10</button>
+    <button type="button" class="mob-tab-btn" data-mob="topall">🌍 ALLE</button>
+  </nav>
+  <div id="mob-panel">
+    <div id="mob-view-feed" class="mob-panel-view active">
+      <div id="mob-sparkline-wrap" style="padding:4px 10px 3px;border-bottom:1px solid var(--dim);background:rgba(0,5,15,0.7);flex-shrink:0;">
+        <div id="mob-sparkline-title" style="font-size:7px;color:rgba(160,255,216,0.35);letter-spacing:1px;margin-bottom:2px;">ANGRIFFE / STUNDE</div>
+        <svg id="mob-sparkline-svg" style="width:100%;height:28px;display:block;"></svg>
+      </div>
+      <div id="mob-filter-bar" style="display:flex;flex-wrap:wrap;gap:3px;padding:3px 8px;background:rgba(0,5,15,0.7);flex-shrink:0;"></div>
+      <div style="padding:4px 8px;border-bottom:1px solid var(--dim);background:rgba(0,5,15,0.8);flex-shrink:0;">
+        <input id="mob-feed-search" type="text" placeholder="🔍  IP, LAND, SZENARIO..." oninput="onMobFeedSearch()" style="width:100%;background:rgba(0,20,40,0.8);border:1px solid var(--dim);border-radius:3px;color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 8px;letter-spacing:0.5px;outline:none;">
+      </div>
+      <div id="mob-feed-filter" style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--dim);background:rgba(0,5,15,0.8);gap:6px;flex-shrink:0;">
+        <span class="sort-lbl" style="font-size:8px;color:rgba(160,255,216,0.4);letter-spacing:1px;">SORTIERUNG:</span>
+        <div style="display:flex;gap:4px;">
+          <button class="fsort-btn active" id="mob-fsort-new" onclick="setFeedSort('newest')">▼ NEU</button>
+          <button class="fsort-btn" id="mob-fsort-old" onclick="setFeedSort('oldest')">▲ ALT</button>
+        </div>
+      </div>
+      <div id="mob-feed-info" style="font-size:8px;color:rgba(160,255,216,0.3);letter-spacing:1px;text-align:center;padding:3px 8px 0;flex-shrink:0;"></div>
+      <div class="mob-panel-scroll">
+        <div id="mob-feed"></div>
+      </div>
+      <div id="mob-feed-pages" style="display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 8px;border-top:1px solid var(--dim);background:rgba(0,5,15,0.9);flex-wrap:wrap;flex-shrink:0;"></div>
+    </div>
+    <div id="mob-view-top10" class="mob-panel-view">
+      <div class="mob-panel-tab-hdr">🏆 TOP 10 · ALLTIME</div>
+      <div class="mob-panel-scroll" id="mob-top10"></div>
+    </div>
+    <div id="mob-view-topall" class="mob-panel-view">
+      <div class="mob-panel-tab-hdr">🌍 ALLE LÄNDER · ALLTIME</div>
+      <div class="mob-panel-scroll" id="mob-topall"></div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script src="assets/js/settings.js"></script>
+<script>
+// ============================================================
+// ⚙️  KONFIGURATION — NUR DIESEN BLOCK ANPASSEN
+// ============================================================
+
+// 1. ⚠️ PFLICHT: IP-Adresse eures Unraid-Servers eintragen
+//    Wie findet ihr die IP? Unraid → Tools → System Information
+//    Oder im Terminal: ip addr | grep inet
+const EXPORTER_URL = 'http://EURE-UNRAID-IP:9456/metrics';
+//  Wird beim Docker-Start automatisch durch entrypoint.sh ersetzt
+
+// Optional: API-Token für Unban (UNBAN_API_TOKEN in docker-compose) — wird beim Start eingetragen
+const UNBAN_API_TOKEN = 'UNBAN_TOKEN_PLACEHOLDER';
+
+// 2. ⚠️ PFLICHT: Koordinaten eures Servers
+//    → Rechtsklick auf Google Maps → "Was ist hier?" → Zahlen kopieren
+//    → Oder: https://www.latlong.net/ eure Stadt suchen
+let SERVER_LAT   = 0.0;
+let SERVER_LON   = 0.0;
+
+// 3. ℹ️  OPTIONAL: Name der Markierung auf der Karte
+//    Wird als Label neben eurem Server-Punkt angezeigt
+let SERVER_NAME_MAP = 'MEIN-SERVER';
+
+// ============================================================
+// Ab hier nichts mehr ändern
+// ============================================================
+
+const APP_VERSION  = 'v2.0.0';
+let REFRESH_MS   = 30000;
+const localUnbanned = new Set();
+const ARC_FPS      = 30;
+let ROCKET_DURATION_MS = 4500;
+let ROCKET_STAGGER_MS = 420;
+let ROCKET_TAIL_T = 0.13;
+let ROCKET_TAIL_LEGACY_T = 0.06;
+let ROCKET_TAIL_ARC_T = 0.10;
+const ROCKET_STYLE_STORAGE_KEY = 'csThreatMapRocketStyle';
+const MAP_SETTINGS_STORAGE_KEY = 'csThreatMapSettings';
+let ROCKET_LANE_SPREAD = 12;
+let REPLAY_PLAY_MS = 180000;
+let MAX_ACTIVE_ROCKETS = 28;
+let MAX_PENDING_ROCKETS = 64;
+let MAX_ROCKET_SPAWN_BATCH = 14;
+let REPLAY_UI_THROTTLE_MS = 220;
+let FLIGHT_LABEL_THROTTLE_MS = 150;
+const MAP_SETTINGS_DEFAULTS={
+  refreshMs:30000,maxActiveRockets:28,maxPendingRockets:64,maxSpawnBatch:14,
+  rocketDurationMs:4500,rocketStaggerMs:420,replayUiThrottleMs:220,flightLabelThrottleMs:150,
+  rocketSpawnMode:'per_attack',maxQueuePerIp:12,
+  rocketTailClassic:0.13,rocketTailLegacy:0.06,rocketTailArc:0.10,rocketLaneSpread:12,
+  showFlightLabels:true,maxFlightLabels:8,replayDurationMin:3,
+  maxConsoleArcs:150,
+  rocketStyle:'rakete',
+  overrideCoords:false,serverLat:'',serverLon:'',serverName:'',
+};
+let mapSettings={...MAP_SETTINGS_DEFAULTS};
+let fetchIntervalId=null;
+let dockerServerCoords={lat:null,lon:null,name:''};
+const CROWDSEC_ARC_COLOR = '#ff9a3c'; // Orange wie CrowdSec Console
+const FIT_ZOOM_BOOST = 1.55;      // für fitMapToPoints (alle Angriffe)
+const FIT_MIN_SCALE = 1.35;
+const HOME_ZOOM_K_DESKTOP = 1.1;  // Standard-Zoom (Console-Übersicht, Bild 2)
+const HOME_ZOOM_K_MOBILE = 1.0;
+const HOME_SCREEN_X_FRAC = 0.48;  // Server horizontal im sichtbaren Kartenbereich
+const HOME_SCREEN_Y_FRAC = 0.28;  // Server höher → Weltkarte füllt Bereich bis zum Logo
+const HOME_PROJ_Y_SHIFT = 0.11;   // Projektion nach oben
+const HOME_TY_NUDGE_PX = 42;      // zusätzlich Karte nach oben schieben
+let rocketStyle='rakete'; // siehe rocket-styles.js (ROCKET_STYLE_IDS) — Standard: Rakete
+const MAP_VIEW_STORAGE_KEY = 'csThreatMapViewPrefs';
+const SHOW_OWN_IP_STORAGE_KEY = 'csThreatMapShowOwnIp';
+const ZOOM_STEP = 0.1;          // +/- Buttons
+let mapViewPrefs={useSavedOnLoad:false,homeK:null,savedView:null};
+let lastAlertsTotal=null;
+let showOwnIp=true;
+let lastWhitelistData=null;
+const AUTO_ZOOM_MIN_MS = 2800;    // Abstand zwischen Auto-Zooms
+const AUTO_ZOOM_MAX_K = 5.5;      // Max. Zoom bei Einzelangriff
+
+const THREAT_TYPES = {
+  cve:  { color:'#ff6a3d', labelDe:'CVE-Exploit', labelEn:'CVE Exploit' },
+  brute:{ color:'#ff5a8a', labelDe:'Brute-Force', labelEn:'Brute Force' },
+  recon:{ color:'#3fb950', labelDe:'Aufklärung', labelEn:'Reconnaissance' },
+  scan: { color:'#1db8d4', labelDe:'Schwachstellen-Scan', labelEn:'Vulnerability Scan' },
+  other:{ color:'#8a9caa', labelDe:'Sonstige', labelEn:'Other' },
+};
+function scenarioCategory(s){const x=(s||'').toLowerCase();if(/cve|exploit|sqli|rce|lfi|rfi/.test(x))return 'cve';if(/ssh|bf|brute|force|login|rdp/.test(x))return 'brute';if(/scan|probing|probe|discovery/.test(x))return 'scan';if(/http|sensitive|recon|path/.test(x))return 'recon';return 'other';}
+function scenarioColor(s){return THREAT_TYPES[scenarioCategory(s)]?.color||THREAT_TYPES.other.color;}
+function threatLabel(cat){const tr=THREAT_TYPES[cat];return tr?(currentLang==='de'?tr.labelDe:tr.labelEn):cat;}
+
+let allEvents=[],liveMode=false,replayPlaying=false,replayRangeH=48,replaySpeed=1;
+let replayCursor=0,replayWinStart=0,replayWinEnd=0,replayLastFrame=0,activeRockets=[],lastReplaySpawnTs=0;
+let lastMetricsText='',replayInitialized=false,replayAutoStarted=false;
+let countriesGeo=null;
+let lastRocketDrawTs=0;
+let lastFlightLabelTs=0;
+let lastReplayUiTs=0;
+let rocketIdSeq=0;
+const pendingRocketsByIp=new Map();
+const rocketLaunchAtByIp=new Map();
+const spawnedRocketKeys=new Set();
+function eventRocketKey(e){
+  const mode=mapSettings.rocketSpawnMode||'per_attack';
+  const ip=e.ip||'?';
+  if(mode==='per_ip')return ip;
+  if(mode==='per_ip_time')return ip+'|'+(e.time_iso||'');
+  return ip+'|'+(e.scenario||'')+'|'+(e.time_iso||'');
+}
+function filterEventsForSpawnMode(events){
+  const mode=mapSettings.rocketSpawnMode||'per_attack';
+  if(mode==='per_attack')return events;
+  const pick={};
+  events.forEach(e=>{
+    const k=eventRocketKey(e);
+    if(!pick[k]||(e.ts||0)>(pick[k].ts||0))pick[k]=e;
+  });
+  return Object.values(pick);
+}
+function updateSpawnModeHint(){
+  const el=document.getElementById('settings-spawn-hint');
+  if(!el)return;
+  const l=LANG[currentLang]||LANG.de;
+  const mode=document.getElementById('set-spawn-mode')?.value||mapSettings.rocketSpawnMode;
+  const key=mode==='per_ip'?'spawn_hint_ip':mode==='per_ip_time'?'spawn_hint_ip_time':'spawn_hint_attack';
+  el.textContent=l[key]||'';
+}
+let autoZoomOn=false;
+let lastAutoZoomTs=0;
+
+const ISO2_NUM={US:'840',CA:'124',MX:'484',BR:'76',AR:'32',GB:'826',DE:'276',FR:'250',NL:'528',BE:'56',ES:'724',IT:'380',PL:'616',RU:'643',UA:'804',CN:'156',IN:'356',JP:'392',KR:'410',AU:'36',ID:'360',SG:'702',HK:'344',TW:'158',TH:'764',VN:'704',MY:'458',PH:'608',PK:'586',IR:'364',IQ:'368',SA:'682',AE:'784',IL:'376',TR:'792',ZA:'710',NG:'566',EG:'818',RO:'642',CZ:'203',SE:'752',NO:'578',DK:'208',FI:'246',AT:'40',CH:'756',PT:'620',GR:'300',HU:'348',RS:'688',BG:'100',HR:'191',SK:'703',LT:'440',LV:'428',EE:'233',IE:'372',NZ:'554',CO:'170',CL:'152',VE:'862',EC:'218',PE:'604',KZ:'398',UZ:'860',BD:'50',NP:'524',MM:'104'};
+function hexToRgba(hex,a){const h=(hex||'#888').replace('#','');const n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return`rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;}
+function countryHeatFill(n,maxN){const r=n/Math.max(maxN,1);if(r>=0.45)return `rgba(220,40,70,${0.4+0.35*r})`;if(r>=0.15)return `rgba(160,90,220,${0.25+0.3*r})`;return `rgba(70,100,180,${0.2+0.2*r})`;}
+function countryStaticFill(cc,byCo,byCoCat,maxN){
+  const n=byCo[cc]||0;if(!n)return '#0a1a2e';
+  const r=n/Math.max(maxN,1);
+  const cat=byCoCat[cc]||'other';
+  const col=THREAT_TYPES[cat]?.color||THREAT_TYPES.other.color;
+  return hexToRgba(col,0.22+r*0.42);
+}
+function updateCountryFills(){
+  if(!mapG)return;
+  if(animOn){mapG.selectAll('.land').attr('fill','#0a1a2e');return;}
+  const events=liveMode?feedData:getEventsInReplay();
+  const byCo={},byCoCat={},catCount={};
+  events.forEach(e=>{
+    byCo[e.country]=(byCo[e.country]||0)+1;
+    const cat=scenarioCategory(e.scenario);
+    if(!catCount[e.country])catCount[e.country]={};
+    catCount[e.country][cat]=(catCount[e.country][cat]||0)+1;
+  });
+  Object.keys(catCount).forEach(cc=>{
+    byCoCat[cc]=Object.entries(catCount[cc]).sort((a,b)=>b[1]-a[1])[0]?.[0]||'other';
+  });
+  const maxC=Math.max(...Object.values(byCo),1);
+  mapG.selectAll('.land').attr('fill',function(d){
+    const id=String(d.id);
+    for(const cc in byCo){if(ISO2_NUM[cc]===id)return countryStaticFill(cc,byCo,byCoCat,maxC);}
+    return '#0a1a2e';
+  });
+}
+function labelPxToSvg(px){return px/Math.max(currentScale,0.15);}
+function countryLabelScreenPx(){
+  if(currentScale<1.15)return 0;
+  if(currentScale>=4)return 0;
+  if(currentScale<=1.3)return 13;
+  if(currentScale<=2.2)return 11;
+  return 10;
+}
+function cityLabelScreenPx(){
+  if(currentScale<2)return 0;
+  if(currentScale>=5)return 0;
+  return Math.min(12,Math.max(8,6+currentScale*0.55));
+}
+function clearArcCanvas(){ctx2d.clearRect(0,0,canvas.width,canvas.height);}
+
+function parseEventTime(iso){if(!iso)return 0;const s=iso.trim().replace(' ','T');const t=Date.parse(/[zZ]$/.test(s)?s:s+'Z');return isNaN(t)?0:t;}
+function fmtReplayClock(ts){return ts?new Date(ts).toLocaleString(currentLang==='de'?'de-DE':'en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';}
+function clearRocketQueues(){pendingRocketsByIp.clear();rocketLaunchAtByIp.clear();}
+function resetRockets(){activeRockets=[];clearRocketQueues();lastFlightLabelTs=0;}
+function totalPendingRockets(){let n=0;pendingRocketsByIp.forEach(q=>{n+=q.length;});return n;}
+function trimActiveRockets(){
+  while(activeRockets.length>MAX_ACTIVE_ROCKETS)activeRockets.shift();
+}
+function clearSpawnedRocketKeys(){spawnedRocketKeys.clear();}
+function rocketQueueKey(ev){return ev.ip||'?';}
+function canLaunchRocketNow(ip){return performance.now()>=(rocketLaunchAtByIp.get(ip)||0);}
+function reserveRocketLaunchSlot(ip){
+  const now=performance.now();
+  const next=Math.max(now,rocketLaunchAtByIp.get(ip)||0);
+  rocketLaunchAtByIp.set(ip,next+ROCKET_STAGGER_MS);
+}
+function initReplayWindow(){const times=allEvents.map(e=>e.ts).filter(t=>t>0);if(!times.length)return;replayWinEnd=Math.max(...times);replayWinStart=Math.max(Math.min(...times),replayWinEnd-replayRangeH*3600000);replayCursor=replayWinStart;lastReplaySpawnTs=replayWinStart;resetRockets();clearSpawnedRocketKeys();updateReplaySlider();}
+function getEventsInReplay(){let list=allEvents.filter(e=>e.ts>=replayWinStart&&e.ts<=replayCursor);if(activeFilters.country)list=list.filter(d=>d.country===activeFilters.country);if(activeFilters.scenario)list=list.filter(d=>d.scenario===activeFilters.scenario);if(activeFilters.search){const q=activeFilters.search;list=list.filter(d=>(d.ip||'').includes(q)||(d.country||'').toLowerCase().includes(q)||(d.scenario||'').toLowerCase().includes(q));}return list;}
+function aggregateFromEvents(events){const by={};events.forEach(e=>{if(!e.lat&&!e.lon)return;const k=`${e.lat.toFixed(2)},${e.lon.toFixed(2)},${e.scenario}`;if(!by[k])by[k]={...e,count:0};by[k].count++;});return Object.values(by);}
+function getDisplayAttackData(){return liveMode?getFilteredAttackData():aggregateFromEvents(getEventsInReplay());}
+function buildThreatLegend(){
+  const html=Object.keys(THREAT_TYPES).map(k=>`<span class="threat-leg"><span class="threat-leg-dot" style="background:${THREAT_TYPES[k].color}"></span>${threatLabel(k)}</span>`).join('');
+  ['threat-legend','threat-legend-mob'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html;});
+}
+function getAlltimeFeedEvents(){
+  return feedData.length?feedData:allEvents;
+}
+function getAlltimeStats(){
+  const events=getAlltimeFeedEvents();
+  let attacks=lastAlertsTotal??'—';
+  if(attacks==='—'&&events.length)attacks=String(events.length);
+  return{
+    attacks,
+    countries:new Set(events.map(e=>e.country).filter(Boolean)).size,
+    scenarios:new Set(events.map(e=>e.scenario).filter(Boolean)).size,
+    uniqueIps:new Set(events.map(e=>e.ip).filter(Boolean)).size,
+  };
+}
+/** Länder-Ranking aus gesamtem Feed (Alltime), unabhängig vom Karten-Zeitfenster. */
+function getAlltimeCountryCounts(){
+  const byC={};
+  getAlltimeFeedEvents().forEach(e=>{
+    const cc=(e.country||'??').toUpperCase();
+    byC[cc]=(byC[cc]||0)+1;
+  });
+  return Object.entries(byC)
+    .map(([country,count])=>({country,count}))
+    .sort((a,b)=>b.count-a.count);
+}
+/** Events im gewählten Karten-Zeitfenster (ZEITRAUM + Replay-Position, ohne Feed-Filter). */
+function getMapWindowEvents(){
+  if(liveMode)return feedData.length?feedData:allEvents;
+  if(replayWinEnd<=replayWinStart)return [];
+  return allEvents.filter(e=>e.ts>=replayWinStart&&e.ts<=replayCursor);
+}
+function getMapWindowStats(){
+  const events=getMapWindowEvents();
+  return{
+    reports:events.length,
+    uniqueIps:new Set(events.map(e=>e.ip).filter(Boolean)).size,
+    scenarios:new Set(events.map(e=>e.scenario).filter(Boolean)).size,
+    countries:new Set(events.map(e=>e.country).filter(Boolean)).size,
+  };
+}
+function formatStatNumber(v){
+  const loc=currentLang==='de'?'de-DE':'en-US';
+  if(typeof v==='number')return v.toLocaleString(loc);
+  const n=parseInt(String(v).replace(/[^\d]/g,''),10);
+  return Number.isFinite(n)?n.toLocaleString(loc):v;
+}
+function updateFooterStats(){
+  const w=getMapWindowStats();
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
+  const reports=formatStatNumber(w.reports);
+  const ips=formatStatNumber(w.uniqueIps);
+  const scenarios=formatStatNumber(w.scenarios);
+  const countries=formatStatNumber(w.countries);
+  set('fs-alerts',reports);
+  set('fs-ips',ips);
+  set('fs-scenarios',scenarios);
+  set('fs-countries',countries);
+  set('mws-alerts',reports);
+  set('mws-ips',ips);
+  set('mws-scenarios',scenarios);
+  set('mws-countries',countries);
+}
+function updateReplaySlider(){const sl=document.getElementById('replay-slider');if(!sl||replayWinEnd<=replayWinStart)return;sl.value=Math.round(1000*(replayCursor-replayWinStart)/(replayWinEnd-replayWinStart));document.getElementById('replay-clock').textContent=fmtReplayClock(replayCursor);document.getElementById('tl-start').textContent=fmtReplayClock(replayWinStart);document.getElementById('tl-end').textContent=fmtReplayClock(replayWinEnd);}
+function clearFlightLabels(){const layer=document.getElementById('flight-labels-layer');if(layer)layer.innerHTML='';}
+function escTag(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function flightTagText(r){
+  const cc=(r.country||'??').toUpperCase();
+  const cityRaw=r.city?translateCity(r.city):'';
+  const city=cityRaw.length>20?cityRaw.slice(0,18)+'…':cityRaw;
+  if(city)return `<span class="flight-tag-cc">${escTag(cc)}</span><span class="flight-tag-sep">·</span><span class="flight-tag-city">${escTag(city)}</span>`;
+  const short=countryDisplayName(cc);
+  return `<span class="flight-tag-city">${escTag(short)}</span>`;
+}
+const FLIGHT_LABEL_OFFSETS=[[0,-10],[0,-22],[0,-34],[14,-14],[-14,-14],[22,-26],[-22,-26],[0,-44],[28,-18],[-28,-18],[36,-32],[-36,-32]];
+function layoutFlightLabels(rockets,z){
+  if(mapSettings.showFlightLabels===false)return [];
+  const minDist=currentScale<1.5?44:32;
+  let maxN=mapSettings.maxFlightLabels??8;
+  if(currentScale<1.2)maxN=Math.min(maxN,3);
+  else if(currentScale<2)maxN=Math.min(maxN,5);
+  const ins=getMapChromeInsets();
+  const minX=ins.l+12;
+  const maxX=W-ins.r-72;
+  const minY=ins.t+8;
+  const maxY=H-ins.b-28;
+  const inChrome=(x,y)=>x<minX||x>maxX||y<minY||y>maxY;
+  const placed=[];
+  const out=[];
+  const seenRocket=new Set();
+  const candidates=rockets.filter(r=>r.t>0.04&&r.t<0.97).sort((a,b)=>b.t-a.t);
+  for(const r of candidates){
+    if(out.length>=maxN)break;
+    if(seenRocket.has(r.id))continue;
+    const baseX=r.sx*z.k+z.x,baseY=r.sy*z.k+z.y;
+    const geoKey=`${Math.round(baseX/12)}_${Math.round(baseY/12)}`;
+    if(out.some(o=>o.geoKey===geoKey))continue;
+    let placedOne=false;
+    for(const[ox,oy]of FLIGHT_LABEL_OFFSETS){
+      const x=baseX+ox,y=baseY+oy;
+      if(inChrome(x,y))continue;
+      if(placed.every(p=>Math.hypot(p.x-x,p.y-y)>=minDist)){
+        placed.push({x,y});
+        seenRocket.add(r.id);
+        out.push({r,x,y,geoKey});
+        placedOne=true;
+        break;
+      }
+    }
+    if(!placedOne&&out.length<maxN){
+      let x=Math.max(minX,Math.min(maxX,baseX));
+      let y=Math.max(minY,Math.min(maxY,baseY-10));
+      if(inChrome(x,y)){x=Math.max(minX,baseX+ins.l*0.15);y=Math.max(minY,baseY-10);}
+      seenRocket.add(r.id);
+      out.push({r,x,y,geoKey});
+      placed.push({x,y});
+    }
+  }
+  return out;
+}
+function updateFlightLabels(rockets){
+  const layer=document.getElementById('flight-labels-layer');
+  if(!layer||!baseSvg)return;
+  layer.innerHTML='';
+  if(mapSettings.showFlightLabels===false)return;
+  const z=d3.zoomTransform(baseSvg.node());
+  layoutFlightLabels(rockets,z).forEach(({r,x,y})=>{
+    const cc=r.country||'??';
+    const col=r.col||scenarioColor(r.scenario);
+    const city=r.city?translateCity(r.city):'';
+    const tip=city?`${cc} · ${city}`:(COUNTRY_NAME[cc]||cc);
+    const tag=document.createElement('div');
+    tag.className='flight-tag';
+    tag.style.left=x+'px';
+    tag.style.top=y+'px';
+    tag.style.setProperty('--tag-accent',col);
+    tag.title=tip;
+    tag.innerHTML=`<span class="flight-tag-flag">${FLAG[cc]||'🌐'}</span><span class="flight-tag-line">${flightTagText(r)}</span>`;
+    layer.appendChild(tag);
+  });
+}
+function mapPointScreen(lon,lat,z){
+  const pt=proj([lon,lat]);
+  if(!pt||!z)return null;
+  return{x:pt[0]*z.k+z.x,y:pt[1]*z.k+z.y};
+}
+function isScreenPointObscured(x,y){
+  const ins=getMapChromeInsets();
+  return x<ins.l+24||y<ins.t+16||x>W-ins.r-24||y>H-ins.b-28;
+}
+function nudgeAttackIntoView(lon,lat,opts={}){
+  if(!zoomBeh||!proj||lon==null||lat==null)return;
+  const z=d3.zoomTransform(baseSvg.node());
+  const scr=mapPointScreen(lon,lat,z);
+  if(!scr||!isScreenPointObscured(scr.x,scr.y))return;
+  const ins=getMapChromeInsets();
+  const visCx=ins.l+(W-ins.l-ins.r)/2;
+  const visCy=ins.t+(H-ins.t-ins.b)*0.45;
+  const tx=z.x+(visCx-scr.x);
+  const ty=z.y+(visCy-scr.y);
+  const t=d3.zoomIdentity.translate(tx,ty).scale(z.k);
+  fitTransform=t;
+  baseSvg.transition().duration(opts.duration||550).ease(d3.easeCubicInOut)
+    .call(zoomBeh.transform,t);
+}
+function maybeAutoZoomToAttack(ev){
+  if(!liveMode)return; // Replay soll Home-Übersicht nicht zerren
+  if(!autoZoomOn||userHasZoomed||!ev||ev.lon==null||ev.lat==null)return;
+  if(!animOn)return;
+  const now=Date.now();
+  if(now-lastAutoZoomTs<AUTO_ZOOM_MIN_MS)return;
+  lastAutoZoomTs=now;
+  zoomToAttackPoint(ev.lon,ev.lat);
+}
+function zoomToAttackPoint(lon,lat,opts={}){
+  if(!zoomBeh||!proj)return;
+  const origin=proj([lon,lat]);
+  const srv=proj([SERVER_LON,SERVER_LAT]);
+  if(!origin)return;
+  const pts=srv&&opts.includeServer!==false?[origin,srv]:[origin];
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+  let x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const minSpan=45;
+  if(x1-x0<minSpan){const c=(x0+x1)/2;x0=c-minSpan/2;x1=c+minSpan/2;}
+  if(y1-y0<minSpan){const c=(y0+y1)/2;y0=c-minSpan/2;y1=c+minSpan/2;}
+  const ins=getMapChromeInsets();
+  const visW=W-ins.l-ins.r;
+  const visH=H-ins.t-ins.b;
+  const pad=opts.pad||(window.innerWidth<=680?32:48);
+  const rangeX=x1-x0||1,rangeY=y1-y0||1;
+  let k=Math.min((visW-pad*2)/rangeX,(visH-pad*2)/rangeY,AUTO_ZOOM_MAX_K);
+  k=Math.max(k,opts.minK||2.4);
+  const cx=(x0+x1)/2,cy=(y0+y1)/2;
+  const visCx=ins.l+visW/2;
+  const visCy=ins.t+visH*0.45;
+  const tx=visCx-cx*k;
+  const ty=visCy-cy*k;
+  const t=d3.zoomIdentity.translate(tx,ty).scale(k);
+  fitTransform=t;
+  baseSvg.transition().duration(opts.duration||750).ease(d3.easeCubicInOut)
+    .call(zoomBeh.transform,t);
+}
+function quadPoint(p,t){const u=1-t;return{x:u*u*p.sx+2*u*t*p.cpx+t*t*p.ex,y:u*u*p.sy+2*u*t*p.cpy+t*t*p.ey};}
+function refreshMapFromData(){
+  attackData=liveMode?parseMetrics(lastMetricsText):aggregateFromEvents(getEventsInReplay());
+  enrichAttackData();
+  buildArcPaths();
+  renderDots();
+  renderMapPanels();
+  updateCountryFills();
+  if(!linesOn){clearArcCanvas();clearFlightLabels();return;}
+  if(rocketStyle==='arc'){
+    if(animOn)startAnimLoop();
+    else drawCrowdSecRockets(performance.now());
+    return;
+  }
+  if(!animOn){clearArcCanvas();clearFlightLabels();return;}
+  if(liveMode)spawnLiveRocketsFromFeed();
+  else if(!replayPlaying&&replayWinEnd>replayWinStart&&replayCursor>=replayWinEnd)spawnRocketsFromFeed();
+  if(animOn)startAnimLoop();
+  else clearArcCanvas();
+}
+function updateReplayControlsUI(){
+  const live=document.getElementById('mode-live-btn');
+  const bar=document.getElementById('replay-bar');
+  const playing=replayPlaying&&!liveMode;
+  if(live)live.classList.toggle('active',!!liveMode);
+  if(bar){
+    bar.classList.toggle('is-live',!!liveMode);
+    bar.classList.toggle('is-replay',!liveMode);
+    bar.classList.toggle('is-playing',playing);
+  }
+}
+function playReplay(){
+  if(replayWinEnd<=replayWinStart&&!allEvents.length)return;
+  if(liveMode){
+    liveMode=false;
+    document.getElementById('mode-live-btn')?.classList.remove('active');
+    initReplayWindow();
+  }
+  if(replayCursor>=replayWinEnd){
+    replayCursor=replayWinStart;
+    lastReplaySpawnTs=replayWinStart;
+    resetRockets();
+    clearSpawnedRocketKeys();
+    updateReplaySlider();
+  }
+  replayPlaying=true;
+  updateReplayControlsUI();
+  startReplayLoop();
+}
+function stopReplay(){
+  replayPlaying=false;
+  if(animRAF){cancelAnimationFrame(animRAF);animRAF=null;}
+  updateReplayControlsUI();
+  if(!liveMode){
+    refreshMapFromData();
+    if(animOn&&linesOn)drawReplayFrame(performance.now());
+  }
+}
+function enterLiveMode(){
+  if(liveMode)return;
+  liveMode=true;
+  replayPlaying=false;
+  if(animRAF){cancelAnimationFrame(animRAF);animRAF=null;}
+  document.getElementById('mode-live-btn')?.classList.add('active');
+  feedData.forEach(e=>spawnedRocketKeys.add(eventRocketKey(e)));
+  const clk=document.getElementById('replay-clock');
+  if(clk)clk.textContent=t('live_clock');
+  updateReplayControlsUI();
+  refreshMapFromData();
+  if(animOn&&linesOn)startAnimLoop();
+}
+function setupReplayControls(){
+  buildThreatLegend();
+  document.getElementById('replay-play-btn')?.addEventListener('click',playReplay);
+  document.getElementById('replay-stop-btn')?.addEventListener('click',stopReplay);
+  document.getElementById('mode-live-btn')?.addEventListener('click',enterLiveMode);
+  document.querySelectorAll('[data-speed]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-speed]').forEach(x=>x.classList.remove('active'));b.classList.add('active');replaySpeed=parseFloat(b.dataset.speed);}));
+  document.querySelectorAll('[data-range]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-range]').forEach(x=>x.classList.remove('active'));b.classList.add('active');replayRangeH=parseInt(b.dataset.range,10);initReplayWindow();refreshMapFromData();}));
+  updateReplayControlsUI();
+  document.getElementById('replay-slider')?.addEventListener('input',e=>{
+    if(replayWinEnd<=replayWinStart)return;
+    if(liveMode){
+      liveMode=false;
+      document.getElementById('mode-live-btn')?.classList.remove('active');
+      updateReplayControlsUI();
+    }
+    replayPlaying=false;
+    updateReplayControlsUI();
+    replayCursor=replayWinStart+(parseInt(e.target.value,10)/1000)*(replayWinEnd-replayWinStart);
+    lastReplaySpawnTs=replayWinStart;
+    resetRockets();
+    clearSpawnedRocketKeys();
+    document.getElementById('replay-clock').textContent=fmtReplayClock(replayCursor);
+    refreshMapFromData();
+  });
+}
+
+// ── COMPACT LAYOUT (Handy + Tablet ≤900px) ──
+const COMPACT_MAX_W=900;
+let layoutModeSig=null;
+let compactMapFitTimer=null;
+function isCompactLayout(){return window.innerWidth<=COMPACT_MAX_W;}
+function getHomeFitParams(){
+  const compact=isCompactLayout();
+  return{
+    xFrac:compact?0.5:HOME_SCREEN_X_FRAC,
+    yFrac:compact?0.36:HOME_SCREEN_Y_FRAC,
+    tyNudge:compact?10:HOME_TY_NUDGE_PX,
+    projShift:compact?0.07:HOME_PROJ_Y_SHIFT,
+    defaultK:compact?HOME_ZOOM_K_MOBILE:HOME_ZOOM_K_DESKTOP,
+  };
+}
+function scheduleCompactMapFit(){
+  clearTimeout(compactMapFitTimer);
+  compactMapFitTimer=setTimeout(()=>{
+    if(!mapWrap||mapWrap.clientWidth<50||mapWrap.clientHeight<50)return;
+    const w=mapWrap.clientWidth,h=mapWrap.clientHeight;
+    const prev=scheduleCompactMapFit._last||{w:0,h:0};
+    const sizeChanged=Math.abs(w-prev.w)>10||Math.abs(h-prev.h)>10;
+    scheduleCompactMapFit._last={w,h};
+    setupProj();
+    resetRockets();
+    clearFlightLabels();
+    clearArcCanvas();
+    if(!baseSvg||!worldData)return;
+    baseSvg.selectAll('*').remove();
+    drawBaseMap();
+    if(isCompactLayout()&&sizeChanged)userHasZoomed=false;
+    renderDots();
+    if(!userHasZoomed)applyInitialMapView();
+    else{
+      const tr=d3.zoomTransform(baseSvg.node());
+      mapG.attr('transform',tr);
+      dotG.attr('transform',tr);
+      currentScale=tr.k;currentTx=tr.x;currentTy=tr.y;
+      updateServerScale();
+      updateZoomLevel(tr.k);
+    }
+    updateCountryFills();
+    if(animOn&&linesOn)startAnimLoop();
+  },120);
+}
+function syncCompactLayout(){
+  const sh=document.getElementById('mob-sheet');
+  const lay=document.getElementById('layout');
+  if(!lay)return;
+  const sig=isCompactLayout()?'compact':'wide';
+  const modeChanged=layoutModeSig!==null&&layoutModeSig!==sig;
+  layoutModeSig=sig;
+  if(!isCompactLayout()){
+    lay.style.bottom='';
+    if(sh)sh.style.height='';
+    if(modeChanged){
+      userHasZoomed=false;
+      scheduleCompactMapFit();
+    }
+    return;
+  }
+  if(!sh)return;
+  const h=sh.offsetHeight;
+  if(h>80){
+    lay.style.bottom=h+'px';
+    sh.style.height='';
+  }else{
+    const px=Math.round(window.innerHeight*0.54);
+    sh.style.height=px+'px';
+    lay.style.bottom=px+'px';
+  }
+  if(modeChanged)userHasZoomed=false;
+  scheduleCompactMapFit();
+}
+(function initCompactLayoutSync(){
+  syncCompactLayout();
+  window.addEventListener('load',syncCompactLayout);
+  window.addEventListener('resize',syncCompactLayout);
+  setTimeout(syncCompactLayout,100);
+  setTimeout(syncCompactLayout,500);
+  const sh=document.getElementById('mob-sheet');
+  if(sh&&window.ResizeObserver){
+    new ResizeObserver(syncCompactLayout).observe(sh);
+  }
+  const mw=document.getElementById('map-wrap');
+  if(mw&&window.ResizeObserver){
+    new ResizeObserver(()=>{
+      if(!isCompactLayout())return;
+      scheduleCompactMapFit();
+    }).observe(mw);
+  }
+})();
+
+// ── TRANSLATIONS ──
+const LANG = {
+  de: {
+    title:       'Self<span>ThreatMap</span>',
+    attacks:     'ANGRIFFE',
+    countries:   'LÄNDER',
+    scenarios:   'SZENARIEN',
+    live:        'LIVE',
+    feed:        '▶ FEED',
+    top10:       '🏆 TOP 10',
+    all:         '🌍 ALLE',
+    sort:        'SORTIERUNG:',
+    newest:      '▼ NEUESTE',
+    oldest:      '▲ ÄLTESTE',
+    anim_off:    'ANIMATION',
+    anim_on:     'ANIMATION',
+    lines_off:   'ANGRIFFE',
+    lines_on:    'ANGRIFFE',
+    autozoom_on: 'ZOOM AUTO',
+    autozoom_off:'ZOOM AUTO',
+    rocket_style_new:'Neu (Schweif + Verlauf)',
+    rocket_style_arc:'Console (gestrichelte Bögen)',
+    rocket_style_legacy:'Minimal (kurzer Strich)',
+    settings_btn:'EINST.',
+    settings_title:'Einstellungen',
+    settings_sec_perf:'Leistung & Daten',
+    settings_sec_anim:'Animation',
+    settings_sec_map:'Karte / Server',
+    set_refresh:'Feed aktualisieren (Sek.)',
+    set_max_active:'Max. Raketen gleichzeitig',
+    set_max_pending:'Max. Warteschlange',
+    set_max_batch:'Raketen pro Schwung',
+    set_preset:'Voreinstellung',
+    set_duration:'Flugdauer (Sek.)',
+    set_stagger:'Abstand gleiche IP (ms)',
+    set_ui_throttle:'Karten-Update Replay (ms)',
+    set_label_throttle:'Flight-Labels (ms)',
+    set_override:'Eigene Koordinaten (überschreibt Docker)',
+    set_lat:'Breitengrad (LAT)',
+    set_lon:'Längengrad (LON)',
+    set_name:'Anzeigename',
+    settings_coords_hint:'Docker: {lat}, {lon} — nur bei deaktivierter Überschreibung aktiv.',
+    settings_reset:'Standard',
+    settings_cancel:'Abbrechen',
+    settings_save:'Speichern',
+    settings_sec_rockets:'Raketen-Logik',
+    set_spawn_mode:'Rakete auslösen pro',
+    spawn_hint_attack:'Jeder Angriff im Feed (IP + Szenario + Zeit) = eigene Rakete.',
+    spawn_hint_ip_time:'Gleiche IP zur gleichen Zeit = eine Rakete (mehrere Szenarien zusammen).',
+    spawn_hint_ip:'Pro IP nur eine Rakete — viele Angriffe derselben IP = ein Flug, Rest in Warteschlange.',
+    set_queue_ip:'Max. Warteschlange pro IP',
+    set_rocket_style_sel:'Raketen-Stil',
+    spawn_mode_attack:'Angriff (IP + Szenario + Zeit)',
+    spawn_mode_ip_time:'IP + Zeitstempel',
+    spawn_mode_ip:'nur IP',
+    set_tail:'Schweif-Länge Neu (%)',
+    set_lane:'Bahn-Abstand (px)',
+    set_max_arcs:'Max. Console-Bögen',
+    set_show_labels:'Flight-Labels anzeigen',
+    set_max_labels:'Max. Flight-Labels',
+    set_replay_min:'Replay-Dauer bei 1× (Min.)',
+    settings_nav_perf:'Leistung',
+    settings_nav_anim:'Animation',
+    settings_nav_rockets:'Raketen',
+    settings_nav_map:'Karte',
+    settings_preset_hint:'Preset setzt nur Leistungswerte. Danach gern fein anpassen.',
+    server_lbl:  SERVER_NAME_MAP,
+    zoom_lbl:    'ZOOM',
+    lookup:      'IP NACHSCHLAGEN',
+    goto_map:    'AUF KARTE',
+    close:       '✕ SCHLIESSEN',
+    unban:       'IP entsperren',
+    leg_1_4:     '1–4 ANGRIFFE',
+    leg_5_9:     '5–9 ANGRIFFE',
+    leg_10_19:   '10–19 ANGRIFFE',
+    leg_20:      '20+ ANGRIFFE',
+    leg_server:  'SERVER',
+    leg_click:   '| KLICK AUF PUNKT = DETAILS',
+    top_scenarios:'TOP-SZENARIEN',
+    malevolent_ips:'BÖSWILLIGE IPS',
+    top_origins:'TOP-HERKUNFTEN',
+    fs_alerts:'MELDUNGEN',
+    fs_ips:'EINDEUTIGE IPS',
+    fs_scenarios:'SZENARIEN',
+    fs_countries:'LÄNDER',
+    lbl_speed:'TEMPO',
+    lbl_range:'ZEITRAUM',
+    mob_lbl_alltime:'GESAMT (ALLTIME)',
+    map_window_title:'ZEITFENSTER · KARTE',
+    replay_play_title:'Wiedergabe starten',
+    replay_stop_title:'Wiedergabe stoppen',
+    live_lbl:'LIVE',
+    live_clock:'● LIVE',
+    entries:     (s,e,t) => `${s}–${e} von ${t} Einträgen`,
+    top_list_empty:'Keine Alltime-Daten — Feed lädt…',
+    prev:        '◀',
+    next:        '▶',
+    error_conn:  'VERBINDUNGSFEHLER: ',
+    error_prefix:'FEHLER: ',
+    load_init:   'INITIALISIERUNG',
+    load_map:    'KARTENDATEN WERDEN GELADEN…',
+    load_feed:   'VERBINDUNG ZUM BEDROHUNGS-FEED…',
+    time_icon:   '🕐',
+    scenario_icon:'⚡',
+    subnet_icon: '📡',
+    sparkline:   'ANGRIFFE / STUNDE',
+    search_ph:   '🔍  IP, LAND, SZENARIO…',
+    theme_lbl:   'THEMA:',
+    theme_cyan:  'CYAN',
+    theme_alarm: 'ALARM',
+    theme_matrix:'MATRIX',
+    theme_amber: 'AMBER',
+    csv_btn:     '↓ CSV',
+    csv_title:   'Feed als CSV exportieren',
+    tip_close:   'Schließen',
+    tip_click:   'KLICK FÜR DETAILS',
+    live_title:  'Live-Feed — aktuelle Angriffe in Echtzeit',
+    home_zoom:   'Zum Server-Standort',
+    zoom_prefs_title:'Karten-Zoom speichern',
+    zoom_prefs_use:'Beim Laden gespeicherte Ansicht',
+    zoom_prefs_save:'Ansicht speichern',
+    zoom_prefs_reset:'Zurücksetzen',
+    zoom_prefs_home:'Standard-Zoom (⌂):',
+    zoom_prefs_saved:(k)=>`Gespeichert: ${k.toFixed(1)}×`,
+    zoom_prefs_none:'Keine gespeicherte Ansicht',
+    zoom_prefs_ok:'Ansicht gespeichert',
+    zoom_prefs_saved_desktop_only:'Gespeicherte Ansicht nur am Desktop (Handy: ⌂)',
+    anim_title:  'Animierte Karte (Replay/Live) vs. statische Heatmap',
+    lines_title: 'Angriffe auf der Karte ein/aus',
+    autozoom_title:'Bei Angriff automatisch in die Region zoomen',
+    wl_title:    'Whitelist-Status',
+    wl_na:       'Whitelist: n/a',
+    wl_err:      '⚠️ Whitelist-Fehler',
+    wl_updated:  (ip) => `🔄 ${ip} aktualisiert`,
+    wl_check:    (c,ch) => `Letzter Check: ${c}${ch ? ' | Geändert: '+ch : ''}`,
+    show_own_ip_on:'EIGENE IP AN',
+    show_own_ip_off:'EIGENE IP AUS',
+    show_own_ip_title:'Eigene IP in der Ecke ein-/ausblenden',
+    wl_ip_hidden:'🛡️ IP ausgeblendet',
+    filter_country: (cc) => `Klick: nur ${cc} anzeigen`,
+    filter_scenario:'Klick: nach Szenario filtern',
+    unban_active:  'Aktiver Ban — entsperren',
+    unban_history: 'Historie löschen',
+    lookup_title:  'IP nachschlagen',
+    map_title:     'Auf Karte zeigen',
+    unban_confirm1:(ip) => `🔓 IP ${ip} wirklich entsperren?\n\nDiese IP wird aus allen aktiven CrowdSec-Bans entfernt.`,
+    unban_confirm2:(ip) => `⚠️ Letzte Warnung!\n\nIP: ${ip}\n\nSicher entsperren? Diese Aktion kann nicht rückgängig gemacht werden.`,
+    unban_fail:    'Unban fehlgeschlagen',
+    unban_conn:    'Verbindungsfehler zum Exporter',
+    csv_headers:   ['IP','Land','Stadt','ASN','AS-Name','Szenario','Anzahl','Zeit'],
+    range_labels:  {'168':'7T','720':'1M','4320':'6M','8760':'12M','17520':'2J','26280':'3J','35040':'4J','43800':'5J','52560':'6J'},
+  },
+  en: {
+    title:       'Self<span>ThreatMap</span>',
+    attacks:     'ATTACKS',
+    countries:   'COUNTRIES',
+    scenarios:   'SCENARIOS',
+    live:        'LIVE',
+    feed:        '▶ FEED',
+    top10:       '🏆 TOP 10',
+    all:         '🌍 ALL',
+    sort:        'SORT:',
+    newest:      '▼ NEWEST',
+    oldest:      '▲ OLDEST',
+    anim_off:    'ANIMATION',
+    anim_on:     'ANIMATION',
+    lines_off:   'FLIGHTS',
+    lines_on:    'FLIGHTS',
+    autozoom_on: 'ZOOM AUTO',
+    autozoom_off:'ZOOM AUTO',
+    rocket_style_new:'New (gradient tail)',
+    rocket_style_arc:'Console (dashed arcs)',
+    rocket_style_legacy:'Minimal (short line)',
+    settings_btn:'SETTINGS',
+    settings_title:'Settings',
+    settings_sec_perf:'Performance & data',
+    settings_sec_anim:'Animation',
+    settings_sec_map:'Map / server',
+    set_refresh:'Refresh feed (sec)',
+    set_max_active:'Max simultaneous rockets',
+    set_max_pending:'Max queue size',
+    set_max_batch:'Rockets per batch',
+    set_preset:'Preset',
+    set_duration:'Flight duration (sec)',
+    set_stagger:'Gap same IP (ms)',
+    set_ui_throttle:'Map refresh replay (ms)',
+    set_label_throttle:'Flight labels (ms)',
+    set_override:'Custom coordinates (overrides Docker)',
+    set_lat:'Latitude (LAT)',
+    set_lon:'Longitude (LON)',
+    set_name:'Display name',
+    settings_coords_hint:'Docker: {lat}, {lon} — used when override is off.',
+    settings_reset:'Defaults',
+    settings_cancel:'Cancel',
+    settings_save:'Save',
+    settings_sec_rockets:'Rocket logic',
+    set_spawn_mode:'Trigger rocket per',
+    spawn_hint_attack:'Each feed entry (IP + scenario + time) = one rocket.',
+    spawn_hint_ip_time:'Same IP at same time = one rocket (multiple scenarios merged).',
+    spawn_hint_ip:'One rocket per IP — repeated attacks queue behind the first.',
+    set_queue_ip:'Max queue per IP',
+    set_rocket_style_sel:'Rocket style',
+    spawn_mode_attack:'Attack (IP + scenario + time)',
+    spawn_mode_ip_time:'IP + timestamp',
+    spawn_mode_ip:'IP only',
+    set_tail:'Tail length new (%)',
+    set_lane:'Path offset (px)',
+    set_max_arcs:'Max console arcs',
+    set_show_labels:'Show flight labels',
+    set_max_labels:'Max flight labels',
+    set_replay_min:'Replay duration at 1× (min)',
+    settings_nav_perf:'Performance',
+    settings_nav_anim:'Animation',
+    settings_nav_rockets:'Rockets',
+    settings_nav_map:'Map',
+    settings_preset_hint:'Preset updates performance fields only. Fine-tune afterwards.',
+    server_lbl:  SERVER_NAME_MAP,
+    zoom_lbl:    'ZOOM',
+    lookup:      'LOOKUP IP',
+    goto_map:    'ON MAP',
+    close:       '✕ CLOSE',
+    unban:       'Unban IP',
+    leg_1_4:     '1–4 ATTACKS',
+    leg_5_9:     '5–9 ATTACKS',
+    leg_10_19:   '10–19 ATTACKS',
+    leg_20:      '20+ ATTACKS',
+    leg_server:  'SERVER',
+    leg_click:   '| CLICK POINT = DETAILS',
+    top_scenarios:'TOP SCENARIOS',
+    malevolent_ips:'MALEVOLENT IPS',
+    top_origins:'TOP ATTACK ORIGINS',
+    fs_alerts:'ALERTS',
+    fs_ips:'UNIQUE IPS',
+    fs_scenarios:'SCENARIOS',
+    fs_countries:'COUNTRIES',
+    lbl_speed:'SPEED',
+    lbl_range:'RANGE',
+    mob_lbl_alltime:'TOTAL (ALLTIME)',
+    map_window_title:'MAP WINDOW',
+    replay_play_title:'Start replay',
+    replay_stop_title:'Stop replay',
+    live_lbl:'LIVE',
+    live_clock:'● LIVE',
+    autozoom_on: 'AUTO ZOOM',
+    autozoom_off:'AUTO ZOOM',
+    entries:     (s,e,t) => `${s}–${e} of ${t} entries`,
+    top_list_empty:'No all-time data — loading feed…',
+    prev:        '◀',
+    next:        '▶',
+    error_conn:  'CONNECTION ERROR: ',
+    error_prefix:'ERROR: ',
+    load_init:   'INITIALIZING',
+    load_map:    'LOADING MAP DATA…',
+    load_feed:   'CONNECTING TO THREAT FEED…',
+    time_icon:   '🕐',
+    scenario_icon:'⚡',
+    subnet_icon: '📡',
+    sparkline:   'ATTACKS / HOUR',
+    search_ph:   '🔍  IP, COUNTRY, SCENARIO…',
+    theme_lbl:   'THEME:',
+    theme_cyan:  'CYAN',
+    theme_alarm: 'ALERT',
+    theme_matrix:'MATRIX',
+    theme_amber: 'AMBER',
+    csv_btn:     '↓ CSV',
+    csv_title:   'Export feed as CSV',
+    tip_close:   'Close',
+    tip_click:   'CLICK FOR DETAILS',
+    live_title:  'Live feed — current attacks in real time',
+    home_zoom:   'Go to server',
+    zoom_prefs_title:'Save map zoom',
+    zoom_prefs_use:'Use saved view on load',
+    zoom_prefs_save:'Save current view',
+    zoom_prefs_reset:'Reset defaults',
+    zoom_prefs_home:'Default zoom (⌂):',
+    zoom_prefs_saved:(k)=>`Saved: ${k.toFixed(1)}×`,
+    zoom_prefs_none:'No saved view',
+    zoom_prefs_ok:'View saved',
+    zoom_prefs_saved_desktop_only:'Saved view: desktop only (mobile: use ⌂)',
+    anim_title:  'Animated map (replay/live) vs. static heatmap',
+    lines_title: 'Attack flights (rockets) on/off',
+    autozoom_title:'Auto-zoom to attack region',
+    wl_title:    'Whitelist status',
+    wl_na:       'Whitelist: n/a',
+    wl_err:      '⚠️ Whitelist error',
+    wl_updated:  (ip) => `🔄 ${ip} updated`,
+    wl_check:    (c,ch) => `Last check: ${c}${ch ? ' | Changed: '+ch : ''}`,
+    show_own_ip_on:'SHOW OWN IP',
+    show_own_ip_off:'HIDE OWN IP',
+    show_own_ip_title:'Show or hide your IP in the footer',
+    wl_ip_hidden:'🛡️ IP hidden',
+    filter_country: (cc) => `Click: show only ${cc}`,
+    filter_scenario:'Click: filter by scenario',
+    unban_active:  'Active ban — unban',
+    unban_history: 'Clear history',
+    lookup_title:  'Look up IP',
+    map_title:     'Show on map',
+    unban_confirm1:(ip) => `🔓 Really unban IP ${ip}?\n\nThis IP will be removed from all active CrowdSec bans.`,
+    unban_confirm2:(ip) => `⚠️ Final warning!\n\nIP: ${ip}\n\nAre you sure? This cannot be undone.`,
+    unban_fail:    'Unban failed',
+    unban_conn:    'Connection error to exporter',
+    csv_headers:   ['IP','Country','City','ASN','AS Name','Scenario','Count','Time'],
+    range_labels:  {'168':'7D','720':'1M','4320':'6M','8760':'12M','17520':'2Y','26280':'3Y','35040':'4Y','43800':'5Y','52560':'6Y'},
+  }
+};
+let currentLang = 'LANGUAGE_PLACEHOLDER'; // wird durch entrypoint.sh ersetzt
+
+function normalizeLang(){
+  let lang=String(currentLang||'de').toLowerCase().trim();
+  if(lang==='LANGUAGE_PLACEHOLDER'||!LANG[lang]) lang='de';
+  currentLang=lang;
+  document.documentElement.lang=lang;
+}
+const CITY_NAMES_DE = {
+  "Antwerp": "Antwerpen", "Athens": "Athen", "Beijing": "Peking",
+  "Belgrade": "Belgrad", "Brasov": "Kronstadt", "Brno": "Brünn",
+  "Brussels": "Brüssel", "Bucharest": "Bukarest", "Cheb": "Eger",
+  "Cologne": "Köln", "Copenhagen": "Kopenhagen", "Dusseldorf": "Düsseldorf",
+  "Florence": "Florenz", "Gdansk": "Danzig", "Geneva": "Genf",
+  "Genoa": "Genua", "Ghent": "Gent", "Gothenburg": "Göteborg",
+  "Katowice": "Kattowitz", "Krakow": "Krakau", "Kyiv": "Kiew",
+  "Liege": "Lüttich", "Lisbon": "Lissabon", "Lubeck": "Lübeck",
+  "Malmo": "Malmö", "Milan": "Mailand", "Moscow": "Moskau",
+  "Munich": "München", "Naples": "Neapel", "Nuremberg": "Nürnberg",
+  "Plzen": "Pilsen", "Prague": "Prag", "Rome": "Rom",
+  "Saint Petersburg": "Sankt Petersburg", "Seville": "Sevilla",
+  "Strasbourg": "Straßburg", "Szczecin": "Stettin", "Tokyo": "Tokio",
+  "Venice": "Venedig", "Vienna": "Wien", "Warsaw": "Warschau",
+  "Wroclaw": "Breslau", "Zurich": "Zürich",
+};
+
+function translateCity(city) {
+  if (!city) return city;
+  if (currentLang === 'de' && CITY_NAMES_DE[city]) return CITY_NAMES_DE[city];
+  return city;
+}
+
+function t(key, ...args){
+  const tr=LANG[currentLang]||LANG.de;
+  const v=tr[key];
+  if(typeof v==='function') return v(...args);
+  return v!=null?v:key;
+}
+
+
+// toggleLang entfernt — Sprache wird über LANGUAGE Docker-Variable gesetzt
+
+const FLAG={AF:'🇦🇫',AL:'🇦🇱',DZ:'🇩🇿',AR:'🇦🇷',AM:'🇦🇲',AU:'🇦🇺',AT:'🇦🇹',AZ:'🇦🇿',BD:'🇧🇩',BY:'🇧🇾',BE:'🇧🇪',BR:'🇧🇷',BG:'🇧🇬',CA:'🇨🇦',CL:'🇨🇱',CN:'🇨🇳',CO:'🇨🇴',HR:'🇭🇷',CZ:'🇨🇿',DK:'🇩🇰',EG:'🇪🇬',EE:'🇪🇪',FI:'🇫🇮',FR:'🇫🇷',DE:'🇩🇪',GR:'🇬🇷',HK:'🇭🇰',HU:'🇭🇺',IN:'🇮🇳',ID:'🇮🇩',IR:'🇮🇷',IQ:'🇮🇶',IE:'🇮🇪',IL:'🇮🇱',IT:'🇮🇹',JP:'🇯🇵',KZ:'🇰🇿',KR:'🇰🇷',LV:'🇱🇻',LT:'🇱🇹',MY:'🇲🇾',MX:'🇲🇽',MD:'🇲🇩',NL:'🇳🇱',NZ:'🇳🇿',NG:'🇳🇬',NO:'🇳🇴',PK:'🇵🇰',PL:'🇵🇱',PT:'🇵🇹',RO:'🇷🇴',RU:'🇷🇺',SA:'🇸🇦',RS:'🇷🇸',SG:'🇸🇬',SK:'🇸🇰',ZA:'🇿🇦',ES:'🇪🇸',SE:'🇸🇪',CH:'🇨🇭',TW:'🇹🇼',TH:'🇹🇭',TR:'🇹🇷',UA:'🇺🇦',AE:'🇦🇪',GB:'🇬🇧',US:'🇺🇸',UZ:'🇺🇿',VN:'🇻🇳',BA:'🇧🇦',MK:'🇲🇰',MA:'🇲🇦',TN:'🇹🇳',LB:'🇱🇧',KW:'🇰🇼',QA:'🇶🇦',OM:'🇴🇲',JO:'🇯🇴',SY:'🇸🇾',LY:'🇱🇾',KH:'🇰🇭',LU:'🇱🇺',SI:'🇸🇮',MN:'🇲🇳'};
+
+const COUNTRY_NAME={
+  AF:'Afghanistan',AL:'Albania',DZ:'Algeria',AR:'Argentina',AM:'Armenia',
+  AU:'Australia',AT:'Austria',AZ:'Azerbaijan',BD:'Bangladesh',BY:'Belarus',
+  BE:'Belgium',BR:'Brazil',BG:'Bulgaria',CA:'Canada',CL:'Chile',
+  CN:'China',CO:'Colombia',HR:'Croatia',CZ:'Czech Rep.',DK:'Denmark',
+  EG:'Egypt',EE:'Estonia',FI:'Finland',FR:'France',DE:'Germany',
+  GR:'Greece',HK:'Hong Kong',HU:'Hungary',IN:'India',ID:'Indonesia',
+  IR:'Iran',IQ:'Iraq',IE:'Ireland',IL:'Israel',IT:'Italy',
+  JP:'Japan',KZ:'Kazakhstan',KR:'Korea',LV:'Latvia',LT:'Lithuania',
+  MY:'Malaysia',MX:'Mexico',MD:'Moldova',NL:'Netherlands',NZ:'New Zealand',
+  NG:'Nigeria',NO:'Norway',PK:'Pakistan',PL:'Poland',PT:'Portugal',
+  RO:'Romania',RU:'Russia',SA:'Saudi Arabia',RS:'Serbia',SG:'Singapore',
+  SK:'Slovakia',ZA:'South Africa',ES:'Spain',SE:'Sweden',CH:'Switzerland',
+  TW:'Taiwan',TH:'Thailand',TR:'Turkey',UA:'Ukraine',AE:'UAE',
+  GB:'UK',US:'USA',UZ:'Uzbekistan',VN:'Vietnam',BA:'Bosnia',
+  MK:'N.Macedonia',MA:'Morocco',TN:'Tunisia',LB:'Lebanon',
+  KW:'Kuwait',QA:'Qatar',OM:'Oman',JO:'Jordan',SY:'Syria',
+  LY:'Libya',KH:'Cambodia',LU:'Luxembourg',SI:'Slovenia',MN:'Mongolia',
+  CU:'Cuba',DO:'Dominican Rep.',EC:'Ecuador',PE:'Peru',VE:'Venezuela',
+  GT:'Guatemala',HN:'Honduras',NI:'Nicaragua',CR:'Costa Rica',PA:'Panama',
+  PY:'Paraguay',UY:'Uruguay',BO:'Bolivia',GH:'Ghana',SN:'Senegal',
+  CI:'Ivory Coast',CM:'Cameroon',TZ:'Tanzania',UG:'Uganda',ZM:'Zambia',
+  ZW:'Zimbabwe',MZ:'Mozambique',ET:'Ethiopia',SD:'Sudan',LK:'Sri Lanka',
+  MM:'Myanmar',KP:'North Korea',AF:'Afghanistan',NP:'Nepal',
+};
+
+
+// Globals
+const mapWrap=document.getElementById('map-wrap');
+const baseSvg=d3.select('#base-svg');
+// dotSvg removed - dots are in baseSvg
+const canvas=document.getElementById('arc-canvas');
+const ctx2d=canvas.getContext('2d');
+let proj,pathGen,W,H,currentScale=1,currentTx=0,currentTy=0;
+let feedData=[];
+let feedSort="newest";
+let feedPage=0;        // current page (0-based)
+const FEED_PER_PAGE=20; // entries per page
+let selectedDot=null;
+let selectedEl=null;
+let attackData=[],worldData=null,zoomBeh,mapG,dotG;
+let arcOffset=0,animRAF=null,lastFrameTime=0;
+let animOn=true;
+let linesOn=true;
+let userHasZoomed=false; // tracks manual zoom so mobile safety-fit doesn't override it
+
+// ── ACTIVE FILTERS (declared here so available to all functions) ──
+const activeFilters={country:null,scenario:null,search:''};
+
+// ── MAP TOGGLES ──
+function setToggleBtn(id,on,dotId){
+  const btn=document.getElementById(id);
+  const dot=dotId?document.getElementById(dotId):null;
+  if(btn){
+    btn.classList.toggle('on',on);
+    btn.classList.toggle('off',!on);
+    if(id==='autozoom-toggle'||id==='mob-autozoom-toggle')btn.setAttribute('aria-pressed',on?'true':'false');
+  }
+  if(dot){
+    dot.style.background=on?'var(--ok)':'rgba(90,110,105,0.45)';
+    dot.style.boxShadow=on?'0 0 5px var(--ok)':'none';
+  }
+}
+function loadRocketStylePrefs(){
+  try{
+    const v=localStorage.getItem(ROCKET_STYLE_STORAGE_KEY);
+    if(v&&(typeof ROCKET_STYLE_IDS==='undefined'?['legacy','classic','arc'].includes(v):ROCKET_STYLE_IDS.includes(v))){
+      rocketStyle=v;
+      if(!localStorage.getItem(MAP_SETTINGS_STORAGE_KEY))mapSettings.rocketStyle=v;
+    }
+  }catch(e){}
+}
+function persistRocketStylePrefs(){
+  try{localStorage.setItem(ROCKET_STYLE_STORAGE_KEY,rocketStyle);}catch(e){}
+  mapSettings.rocketStyle=rocketStyle;
+  persistMapSettings();
+}
+function clampNum(v,min,max,fallback){const n=Number(v);return Number.isFinite(n)?Math.min(max,Math.max(min,n)):fallback;}
+function syncSettingsToGlobals(){
+  REFRESH_MS=mapSettings.refreshMs;
+  ROCKET_DURATION_MS=mapSettings.rocketDurationMs;
+  ROCKET_STAGGER_MS=mapSettings.rocketStaggerMs;
+  MAX_ACTIVE_ROCKETS=mapSettings.maxActiveRockets;
+  MAX_PENDING_ROCKETS=mapSettings.maxPendingRockets;
+  MAX_ROCKET_SPAWN_BATCH=mapSettings.maxSpawnBatch;
+  REPLAY_UI_THROTTLE_MS=mapSettings.replayUiThrottleMs;
+  FLIGHT_LABEL_THROTTLE_MS=mapSettings.flightLabelThrottleMs;
+  ROCKET_TAIL_T=mapSettings.rocketTailClassic??0.13;
+  ROCKET_TAIL_LEGACY_T=mapSettings.rocketTailLegacy??0.06;
+  ROCKET_LANE_SPREAD=mapSettings.rocketLaneSpread??12;
+  REPLAY_PLAY_MS=Math.round((mapSettings.replayDurationMin??3)*60000);
+  if((typeof ROCKET_STYLE_IDS==='undefined'?['legacy','classic','arc']:ROCKET_STYLE_IDS).includes(mapSettings.rocketStyle))rocketStyle=mapSettings.rocketStyle;
+  ROCKET_TAIL_ARC_T=mapSettings.rocketTailArc??0.10;
+}
+function loadMapSettings(){
+  try{
+    const raw=localStorage.getItem(MAP_SETTINGS_STORAGE_KEY);
+    if(raw)mapSettings={...MAP_SETTINGS_DEFAULTS,...JSON.parse(raw)};
+  }catch(e){mapSettings={...MAP_SETTINGS_DEFAULTS};}
+  const modes=['per_attack','per_ip_time','per_ip'];
+  if(!modes.includes(mapSettings.rocketSpawnMode))mapSettings.rocketSpawnMode='per_attack';
+  syncSettingsToGlobals();
+}
+function persistMapSettings(){
+  try{localStorage.setItem(MAP_SETTINGS_STORAGE_KEY,JSON.stringify(mapSettings));}catch(e){}
+}
+function applyCoordOverrides(){
+  if(mapSettings.overrideCoords){
+    const lat=parseFloat(String(mapSettings.serverLat).replace(',','.'));
+    const lon=parseFloat(String(mapSettings.serverLon).replace(',','.'));
+    if(Number.isFinite(lat)&&Number.isFinite(lon)){SERVER_LAT=lat;SERVER_LON=lon;}
+    if(mapSettings.serverName)SERVER_NAME_MAP=String(mapSettings.serverName);
+  }else if(dockerServerCoords.lat!=null&&dockerServerCoords.lon!=null){
+    SERVER_LAT=dockerServerCoords.lat;
+    SERVER_LON=dockerServerCoords.lon;
+    if(dockerServerCoords.name)SERVER_NAME_MAP=dockerServerCoords.name;
+  }
+}
+function restartFetchLoop(){
+  if(fetchIntervalId)clearInterval(fetchIntervalId);
+  fetchIntervalId=setInterval(fetchAndRender,REFRESH_MS);
+}
+function updateSettingsCoordsHint(){
+  const el=document.getElementById('settings-coords-hint');
+  if(!el)return;
+  const l=LANG[currentLang]||LANG.de;
+  const lat=dockerServerCoords.lat!=null?dockerServerCoords.lat:'—';
+  const lon=dockerServerCoords.lon!=null?dockerServerCoords.lon:'—';
+  const tpl=l.settings_coords_hint||'Docker: {lat}, {lon}';
+  el.textContent=tpl.replace('{lat}',lat).replace('{lon}',lon);
+}
+function syncSettingsFormDisabled(){
+  const on=!!document.getElementById('set-override-coords')?.checked;
+  ['set-server-lat','set-server-lon','set-server-name'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.disabled=!on;
+  });
+}
+function fillSettingsForm(){
+  const s=mapSettings;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el!=null)el.value=v;};
+  set('set-refresh-sec',Math.round(s.refreshMs/1000));
+  set('set-max-active',s.maxActiveRockets);
+  set('set-max-pending',s.maxPendingRockets);
+  set('set-max-batch',s.maxSpawnBatch);
+  set('set-duration-sec',s.rocketDurationMs/1000);
+  set('set-stagger-ms',s.rocketStaggerMs);
+  set('set-ui-throttle',s.replayUiThrottleMs);
+  set('set-label-throttle',s.flightLabelThrottleMs);
+  set('set-replay-min',s.replayDurationMin??3);
+  const sm=document.getElementById('set-spawn-mode');
+  if(sm)sm.value=s.rocketSpawnMode||'per_attack';
+  set('set-queue-ip',s.maxQueuePerIp??12);
+  const rs=document.getElementById('set-rocket-style');
+  if(rs)rs.value=s.rocketStyle||rocketStyle||'classic';
+  set('set-tail-classic',Math.round((s.rocketTailClassic??0.13)*100));
+  set('set-lane-spread',s.rocketLaneSpread??12);
+  set('set-max-arcs',s.maxConsoleArcs??150);
+  const sl=document.getElementById('set-show-labels');
+  if(sl)sl.checked=s.showFlightLabels!==false;
+  set('set-max-labels',s.maxFlightLabels??8);
+  const oc=document.getElementById('set-override-coords');
+  if(oc)oc.checked=!!s.overrideCoords;
+  set('set-server-lat',s.serverLat!==''?s.serverLat:SERVER_LAT);
+  set('set-server-lon',s.serverLon!==''?s.serverLon:SERVER_LON);
+  set('set-server-name',s.serverName||SERVER_NAME_MAP);
+  syncSettingsFormDisabled();
+  updateSettingsCoordsHint();
+  updateSpawnModeHint();
+}
+function readSettingsForm(){
+  const set=(id)=>document.getElementById(id);
+  const refreshSec=clampNum(set('set-refresh-sec')?.value,5,120,30);
+  return{
+    refreshMs:refreshSec*1000,
+    maxActiveRockets:clampNum(set('set-max-active')?.value,5,99999,28),
+    maxPendingRockets:clampNum(set('set-max-pending')?.value,10,99999,64),
+    maxSpawnBatch:clampNum(set('set-max-batch')?.value,3,99999,14),
+    rocketDurationMs:clampNum(set('set-duration-sec')?.value,1,20,4.5)*1000,
+    rocketStaggerMs:clampNum(set('set-stagger-ms')?.value,50,5000,420),
+    replayUiThrottleMs:clampNum(set('set-ui-throttle')?.value,80,1000,220),
+    flightLabelThrottleMs:clampNum(set('set-label-throttle')?.value,50,500,150),
+    replayDurationMin:clampNum(set('set-replay-min')?.value,1,30,3),
+    rocketSpawnMode:['per_attack','per_ip_time','per_ip'].includes(set('set-spawn-mode')?.value)?set('set-spawn-mode').value:'per_attack',
+    maxQueuePerIp:clampNum(set('set-queue-ip')?.value,1,50,12),
+    rocketStyle:(typeof ROCKET_STYLE_IDS==='undefined'?['classic','legacy','arc']:ROCKET_STYLE_IDS).includes(set('set-rocket-style')?.value)?set('set-rocket-style').value:'rakete',
+    rocketTailClassic:clampNum(set('set-tail-classic')?.value,4,25,13)/100,
+    rocketTailLegacy:mapSettings.rocketTailLegacy??0.06,
+    rocketLaneSpread:clampNum(set('set-lane-spread')?.value,0,30,12),
+    showFlightLabels:!!set('set-show-labels')?.checked,
+    maxConsoleArcs:clampNum(set('set-max-arcs')?.value,10,500,150),
+    maxFlightLabels:clampNum(set('set-max-labels')?.value,0,30,8),
+    overrideCoords:!!set('set-override-coords')?.checked,
+    serverLat:String(set('set-server-lat')?.value||'').trim(),
+    serverLon:String(set('set-server-lon')?.value||'').trim(),
+    serverName:String(set('set-server-name')?.value||'').trim(),
+  };
+}
+function openSettingsModal(){
+  fillSettingsForm();
+  const m=document.getElementById('settings-modal');
+  if(!m)return;
+  m.classList.remove('hidden');
+  m.setAttribute('aria-hidden','false');
+  document.getElementById('set-refresh-sec')?.focus();
+}
+function closeSettingsModal(){
+  const m=document.getElementById('settings-modal');
+  if(!m)return;
+  m.classList.add('hidden');
+  m.setAttribute('aria-hidden','true');
+}
+function saveSettingsFromForm(){
+  mapSettings=readSettingsForm();
+  rocketStyle=mapSettings.rocketStyle||'rakete';
+  persistMapSettings();
+  persistRocketStylePrefs();
+  syncSettingsToGlobals();
+  syncRocketStyleUI();
+  applyCoordOverrides();
+  restartFetchLoop();
+  if(dotG){
+    drawServerDots();
+    renderDots();
+    drawCountryLabels();
+    if(!userHasZoomed)scheduleHomeFit();
+  }
+  if(animOn&&linesOn)drawCrowdSecRockets(performance.now());
+  closeSettingsModal();
+}
+function resetMapSettings(){
+  mapSettings={...MAP_SETTINGS_DEFAULTS};
+  rocketStyle=mapSettings.rocketStyle;
+  persistMapSettings();
+  persistRocketStylePrefs();
+  syncSettingsToGlobals();
+  syncRocketStyleUI();
+  applyCoordOverrides();
+  restartFetchLoop();
+  fillSettingsForm();
+  if(dotG){drawServerDots();renderDots();drawCountryLabels();}
+}
+function syncSettingsModalLang(){
+  const l=LANG[currentLang]||LANG.de;
+  const set=(id,key)=>{const el=document.getElementById(id);if(el)el.textContent=l[key]||'';};
+  set('settings-title','settings_title');
+  set('settings-sec-perf','settings_sec_perf');
+  set('settings-sec-anim','settings_sec_anim');
+  set('settings-sec-map','settings_sec_map');
+  set('settings-sec-rockets','settings_sec_rockets');
+  set('set-lbl-preset','set_preset');
+  set('set-lbl-spawn-mode','set_spawn_mode');
+  set('set-lbl-queue-ip','set_queue_ip');
+  set('set-lbl-rocket-style','set_rocket_style_sel');
+  set('set-lbl-tail','set_tail');
+  set('set-lbl-lane','set_lane');
+  set('set-lbl-max-arcs','set_max_arcs');
+  set('set-lbl-show-labels','set_show_labels');
+  set('set-lbl-max-labels','set_max_labels');
+  set('set-lbl-replay-min','set_replay_min');
+  const sm=document.getElementById('set-spawn-mode');
+  if(sm&&l.spawn_mode_attack){
+    sm.options[0].text=l.spawn_mode_attack;
+    sm.options[1].text=l.spawn_mode_ip_time;
+    sm.options[2].text=l.spawn_mode_ip;
+  }
+  const rs=document.getElementById('set-rocket-style');
+  if(rs&&l.rocket_style_new){
+    rs.options[0].text=l.rocket_style_new;
+    if(rs.options[1])rs.options[1].text=l.rocket_style_arc||'Klassisch';
+    if(rs.options[2])rs.options[2].text=l.rocket_style_legacy||'Minimal';
+  }
+  updateSpawnModeHint();
+  set('set-lbl-refresh','set_refresh');
+  set('set-lbl-max-active','set_max_active');
+  set('set-lbl-max-pending','set_max_pending');
+  set('set-lbl-max-batch','set_max_batch');
+  set('set-lbl-duration','set_duration');
+  set('set-lbl-stagger','set_stagger');
+  set('set-lbl-ui-throttle','set_ui_throttle');
+  set('set-lbl-label-throttle','set_label_throttle');
+  set('set-lbl-override','set_override');
+  set('set-lbl-lat','set_lat');
+  set('set-lbl-lon','set_lon');
+  set('set-lbl-name','set_name');
+  set('settings-reset-btn','settings_reset');
+  set('settings-cancel-btn','settings_cancel');
+  set('settings-save-btn','settings_save');
+  const nav=document.querySelectorAll('.settings-nav button');
+  if(nav[0])nav[0].textContent=l.settings_nav_perf||'Leistung';
+  if(nav[1])nav[1].textContent=l.settings_nav_anim||'Animation';
+  if(nav[2])nav[2].textContent=l.settings_nav_rockets||'Raketen';
+  if(nav[3])nav[3].textContent=l.settings_nav_map||'Karte';
+  const hint=document.getElementById('settings-preset-hint');
+  if(hint)hint.textContent=l.settings_preset_hint||hint.textContent;
+  const openLbl=document.getElementById('settings-open-lbl');
+  if(openLbl)openLbl.textContent=l.settings_btn||'EINST.';
+  const mobBtn=document.getElementById('settings-open-btn-mob');
+  if(mobBtn)mobBtn.title=l.settings_title||'';
+  const deskBtn=document.getElementById('settings-open-btn');
+  if(deskBtn)deskBtn.title=l.settings_title||'';
+  updateSettingsCoordsHint();
+  updateSettingsHelpForField('default');
+}
+function ensureAutoZoomOff(){
+  autoZoomOn=false;
+  setToggleBtn('autozoom-toggle',false,'autozoom-dot');
+  setToggleBtn('mob-autozoom-toggle',false,'mob-autozoom-dot');
+  const l=LANG[currentLang]||LANG.de;
+  const lbl=document.getElementById('autozoom-label');
+  const mobLbl=document.getElementById('mob-autozoom-label');
+  if(lbl)lbl.textContent=l.autozoom_off;
+  if(mobLbl)mobLbl.textContent=l.autozoom_off;
+}
+function syncMapToggleStates(){
+  setToggleBtn('anim-toggle',animOn,'anim-dot');
+  setToggleBtn('lines-toggle',linesOn,'lines-dot');
+  setToggleBtn('autozoom-toggle',autoZoomOn,'autozoom-dot');
+  setToggleBtn('mob-anim-toggle',animOn,'mob-anim-dot');
+  setToggleBtn('mob-lines-toggle',linesOn,'mob-lines-dot');
+  setToggleBtn('mob-autozoom-toggle',autoZoomOn,'mob-autozoom-dot');
+  const l=LANG[currentLang]||LANG.de;
+  const animLbl=document.getElementById('anim-label');
+  if(animLbl)animLbl.textContent=animOn?l.anim_on:l.anim_off;
+  const linesLbl=document.getElementById('lines-label');
+  if(linesLbl)linesLbl.textContent=linesOn?l.lines_on:l.lines_off;
+  const mobLinesLbl=document.getElementById('mob-lines-label');
+  if(mobLinesLbl)mobLinesLbl.textContent=linesOn?l.lines_on:l.lines_off;
+  const mobAnimLbl=document.getElementById('mob-anim-label');
+  if(mobAnimLbl)mobAnimLbl.textContent=animOn?l.anim_on:l.anim_off;
+  const azLbl=document.getElementById('autozoom-label');
+  if(azLbl)azLbl.textContent=autoZoomOn?l.autozoom_on:l.autozoom_off;
+  const mobAzLbl=document.getElementById('mob-autozoom-label');
+  if(mobAzLbl)mobAzLbl.textContent=autoZoomOn?l.autozoom_on:l.autozoom_off;
+  syncRocketStyleUI();
+}
+function toggleAutoZoom(){
+  autoZoomOn=!autoZoomOn;
+  setToggleBtn('autozoom-toggle',autoZoomOn,'autozoom-dot');
+  setToggleBtn('mob-autozoom-toggle',autoZoomOn,'mob-autozoom-dot');
+  const lbl=document.getElementById('autozoom-label');
+  const mobLbl=document.getElementById('mob-autozoom-label');
+  const txt=autoZoomOn?t('autozoom_on'):t('autozoom_off');
+  if(lbl)lbl.textContent=txt;
+  if(mobLbl)mobLbl.textContent=txt;
+}
+function toggleLines(){
+  linesOn=!linesOn;
+  const lbl=document.getElementById('lines-label');
+  const mobLbl=document.getElementById('mob-lines-label');
+  setToggleBtn('lines-toggle',linesOn,'lines-dot');
+  setToggleBtn('mob-lines-toggle',linesOn,'mob-lines-dot');
+  if(lbl)lbl.textContent=linesOn?(t('lines_on')||'ANGRIFFE'):(t('lines_off')||'ANGRIFFE');
+  if(mobLbl)mobLbl.textContent=linesOn?(t('lines_on')||'ANGRIFFE'):(t('lines_off')||'ANGRIFFE');
+  if(linesOn)refreshMapFromData();
+  else{resetRockets();if(animRAF){cancelAnimationFrame(animRAF);animRAF=null;}clearArcCanvas();clearFlightLabels();if(animOn)refreshMapFromData();else updateCountryFills();}
+}
+
+// ── ANIMATION TOGGLE ──
+function toggleAnim(){
+  animOn=!animOn;
+  if(!animOn){resetRockets();clearArcCanvas();clearFlightLabels();if(animRAF){cancelAnimationFrame(animRAF);animRAF=null;}}
+  const lbl=document.getElementById('anim-label');
+  const mobLbl=document.getElementById('mob-anim-label');
+  setToggleBtn('anim-toggle',animOn,'anim-dot');
+  setToggleBtn('mob-anim-toggle',animOn,'mob-anim-dot');
+  const animTxt=animOn?(t('anim_on')||'ANIMATION'):(t('anim_off')||'ANIMATION');
+  if(lbl)lbl.textContent=animTxt;
+  if(mobLbl)mobLbl.textContent=animTxt;
+  if(animOn){
+    if(liveMode)startAnimLoop();
+    else{
+      replayCursor=replayWinStart;
+      lastReplaySpawnTs=replayWinStart;
+      resetRockets();
+      spawnedRocketKeys.clear();
+      replayPlaying=true;
+      updateReplayControlsUI();
+      startReplayLoop();
+    }
+  }else{
+    replayPlaying=false;updateReplayControlsUI();
+    refreshMapFromData();
+  }
+  drawCountryLabels();
+}
+function startMapOnLoad(){
+  syncMapToggleStates();
+  if(liveMode)feedData.forEach(e=>spawnedRocketKeys.add(eventRocketKey(e)));
+  if(!userHasZoomed)applyInitialMapView();
+  if(animOn){
+    if(liveMode)startAnimLoop();
+    else if(allEvents.length){replayPlaying=true;updateReplayControlsUI();startReplayLoop();}
+  }
+}
+
+// ── SETUP ──
+function syncZoom(src,targets){
+  src.on('zoom.sync',function(event){
+    targets.forEach(t=>t.call(zoomBeh.transform,event.transform));
+  });
+}
+
+let fitTransform = d3.zoomIdentity;
+let homeTransform = d3.zoomIdentity; // Server-Standort — Home-Button + Seitenstart
+
+function loadScript(src){
+  return new Promise((res,rej)=>{
+    if(window.topojson)return res();
+    const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);
+  });
+}
+
+function serverCoordsConfigured(){
+  return Number.isFinite(SERVER_LAT)&&Number.isFinite(SERVER_LON)
+    &&!(Math.abs(SERVER_LAT)<0.0001&&Math.abs(SERVER_LON)<0.0001)
+    &&SERVER_LAT>=-90&&SERVER_LAT<=90&&SERVER_LON>=-180&&SERVER_LON<=180;
+}
+async function loadServerConfig(){
+  try{
+    const base=EXPORTER_URL.replace(/\/metrics\/?$/,'').replace(/\/$/,'');
+    const r=await fetch(`${base||''}/config`,{cache:'no-store'});
+    if(!r.ok)return;
+    const c=await r.json();
+    const lat=parseFloat(c.server_lat);
+    const lon=parseFloat(c.server_lon);
+    if(Number.isFinite(lat)&&Number.isFinite(lon)&&!(lat===0&&lon===0)){
+      dockerServerCoords={lat,lon,name:c.server_name?String(c.server_name):''};
+      if(!mapSettings.overrideCoords){
+        SERVER_LAT=lat;
+        SERVER_LON=lon;
+      }
+    }
+    if(c.server_name){
+      dockerServerCoords.name=String(c.server_name);
+      if(!mapSettings.overrideCoords)SERVER_NAME_MAP=dockerServerCoords.name;
+    }
+    applyCoordOverrides();
+    updateSettingsCoordsHint();
+  }catch(e){}
+}
+
+const SERVER_DOT_R=4;
+const SERVER_LABEL_GAP=7;
+
+function drawServerDots(){
+  const [sx,sy]=proj([SERVER_LON,SERVER_LAT]);
+  dotG.selectAll('.srv-dot,.srv-label').remove();
+  const srvCol=getComputedStyle(document.documentElement).getPropertyValue('--server').trim()||'#1db8d4';
+  dotG.append('circle').attr('class','srv-dot').attr('cx',sx).attr('cy',sy)
+    .attr('r',SERVER_DOT_R).attr('fill',srvCol).attr('stroke','rgba(255,255,255,0.85)').attr('stroke-width',1);
+  dotG.append('text').attr('class','srv-label').attr('x',sx+SERVER_LABEL_GAP).attr('y',sy+3)
+    .attr('data-sx',sx).attr('fill',srvCol)
+    .attr('font-family','Share Tech Mono,monospace').attr('font-size','7px').text(SERVER_NAME_MAP||'SERVER');
+  updateServerScale();
+}
+
+function updateCityLabelScale(){
+  if(!dotG)return;
+  const px=cityLabelScreenPx();
+  dotG.selectAll('.city-map-label')
+    .attr('font-size',px?`${labelPxToSvg(px)}px`:'0')
+    .style('display',px?null:'none');
+}
+function updateCountryLabelScale(){
+  if(!mapG)return;
+  const px=countryLabelScreenPx();
+  mapG.selectAll('.country-label')
+    .attr('font-size',px?`${labelPxToSvg(px)}px`:'0')
+    .style('display',px?null:'none')
+    .attr('opacity',px?0.78:0);
+}
+function updateServerScale(){
+  if(!dotG)return;
+  const ik=1/currentScale;
+  dotG.selectAll('.srv-dot').attr('r',SERVER_DOT_R*ik).attr('stroke-width',ik);
+  const [sx]=proj([SERVER_LON,SERVER_LAT]);
+  dotG.selectAll('.srv-label')
+    .attr('font-size',(7*ik)+'px')
+    .attr('x',sx+SERVER_LABEL_GAP*ik)
+    .attr('y',function(){
+      const [,sy]=proj([SERVER_LON,SERVER_LAT]);
+      return sy+3*ik;
+    });
+}
+
+// ── ARC PATHS ──
+let arcPaths=[];
+function buildArcPaths(){
+  arcPaths=[];
+  const [sx,sy]=proj([SERVER_LON,SERVER_LAT]);
+  const data=getDisplayAttackData();
+  data.forEach(d=>{
+    const pt=proj([d.lon,d.lat]);
+    if(!pt)return;
+    const [px,py]=pt;
+    const dx=sx-px,dy=sy-py,dist=Math.sqrt(dx*dx+dy*dy);
+    arcPaths.push({
+      sx:px,sy:py,ex:sx,ey:sy,
+      cpx:(px+sx)/2,cpy:(py+sy)/2-Math.min(dist*0.38,130),
+      col:countColor(d.count||1),
+      phase:Math.random()*10,
+      scenario:d.scenario,
+    });
+  });
+}
+
+// Bögen nur als temporäre Raketen (drawCrowdSecRockets) — keine dauerhaften arcPaths mehr
+
+function getMapPanelInsetLeft(){
+  const wrap=mapWrap;
+  if(!wrap)return 8;
+  const wr=wrap.getBoundingClientRect();
+  let l=8;
+  const left=document.getElementById('map-panels-left');
+  if(left&&left.offsetParent!==null&&getComputedStyle(left).display!=='none'){
+    const r=left.getBoundingClientRect();
+    l=Math.max(l,r.right-wr.left+8);
+  }
+  return l;
+}
+function getMapChromeInsets(){
+  const wrap=mapWrap;
+  if(!wrap)return{l:0,t:40,r:0,b:72};
+  const wr=wrap.getBoundingClientRect();
+  const ins={l:14,t:28,r:14,b:68};
+  ins.l=Math.max(ins.l,getMapPanelInsetLeft());
+  const zc=document.getElementById('zoom-ctrl');
+  if(zc){
+    const r=zc.getBoundingClientRect();
+    ins.l=Math.max(ins.l,r.right-wr.left+10);
+  }
+  const zl=document.getElementById('zoom-level');
+  if(zl){
+    const r=zl.getBoundingClientRect();
+    ins.l=Math.max(ins.l,r.right-wr.left+8);
+  }
+  const consoleBar=document.getElementById('map-console-bar');
+  if(consoleBar&&!isCompactLayout()){
+    const r=consoleBar.getBoundingClientRect();
+    if(r.top<wr.bottom+2)ins.b=Math.max(ins.b,wr.bottom-r.top+6);
+  }
+  const replay=document.getElementById('replay-bar');
+  if(replay){
+    const r=replay.getBoundingClientRect();
+    ins.b=Math.max(ins.b,wr.bottom-r.top+10);
+  }
+  return ins;
+}
+function getHomeViewInsets(){
+  const ins=getMapChromeInsets();
+  const wrap=mapWrap;
+  const title=document.getElementById('map-title-overlay');
+  ins.t=0;
+  if(wrap&&title){
+    const wr=wrap.getBoundingClientRect();
+    const tr=title.getBoundingClientRect();
+    ins.t=Math.max(0,Math.round(tr.bottom-wr.top));
+  }
+  return ins;
+}
+function updateZoomLevel(kOrTransform){
+  const zl=document.getElementById('zoom-level');
+  if(!zl)return;
+  const k=typeof kOrTransform==='number'?kOrTransform:(kOrTransform?.k??currentScale);
+  zl.textContent=`${t('zoom_lbl')} ${k.toFixed(1)}×`;
+}
+function zoomByStep(delta){
+  if(!zoomBeh)return;
+  const zt=d3.zoomTransform(baseSvg.node());
+  const k=Math.max(0.1,Math.min(25,zt.k+delta));
+  baseSvg.transition().duration(180).call(zoomBeh.transform,d3.zoomIdentity.translate(zt.x,zt.y).scale(k))
+    .on('end',()=>updateZoomLevel(d3.zoomTransform(baseSvg.node()).k));
+}
+function loadMapViewPrefs(){
+  try{
+    const raw=localStorage.getItem(MAP_VIEW_STORAGE_KEY);
+    if(raw){
+      const p=JSON.parse(raw);
+      if(typeof p.useSavedOnLoad==='boolean')mapViewPrefs.useSavedOnLoad=p.useSavedOnLoad;
+      if(typeof p.homeK==='number'&&p.homeK>=0.5&&p.homeK<=25)mapViewPrefs.homeK=p.homeK;
+      if(p.savedView&&typeof p.savedView.k==='number')mapViewPrefs.savedView={k:p.savedView.k,x:p.savedView.x,y:p.savedView.y};
+    }
+  }catch(e){}
+  syncZoomPrefsUI();
+}
+function persistMapViewPrefs(){
+  try{localStorage.setItem(MAP_VIEW_STORAGE_KEY,JSON.stringify(mapViewPrefs));}catch(e){}
+  syncZoomPrefsUI();
+}
+function syncZoomPrefsUI(){
+  const useEl=document.getElementById('zoom-prefs-use-saved');
+  const homeEl=document.getElementById('zoom-prefs-home-k');
+  const homeVal=document.getElementById('zoom-prefs-home-val');
+  const status=document.getElementById('zoom-prefs-status');
+  const {defaultK}=getHomeFitParams();
+  const hk=mapViewPrefs.homeK??defaultK;
+  if(useEl)useEl.checked=!!mapViewPrefs.useSavedOnLoad;
+  if(homeEl){homeEl.value=String(hk);homeEl.title=t('zoom_prefs_home');}
+  if(homeVal)homeVal.textContent=hk.toFixed(1)+'×';
+  if(status){
+    if(isCompactLayout()&&mapViewPrefs.savedView)status.textContent=t('zoom_prefs_saved_desktop_only');
+    else if(mapViewPrefs.savedView)status.textContent=t('zoom_prefs_saved',mapViewPrefs.savedView.k);
+    else status.textContent=t('zoom_prefs_none');
+  }
+}
+function toggleZoomPrefsPanel(){
+  const panel=document.getElementById('zoom-prefs-panel');
+  if(!panel)return;
+  const open=!panel.classList.contains('open');
+  panel.classList.toggle('open',open);
+  panel.setAttribute('aria-hidden',open?'false':'true');
+}
+function saveCurrentMapViewAsStart(){
+  if(!baseSvg||!zoomBeh)return;
+  const tr=d3.zoomTransform(baseSvg.node());
+  mapViewPrefs.savedView={k:tr.k,x:tr.x,y:tr.y};
+  mapViewPrefs.useSavedOnLoad=true;
+  persistMapViewPrefs();
+  const status=document.getElementById('zoom-prefs-status');
+  if(status)status.textContent=t('zoom_prefs_ok');
+}
+function resetMapViewPrefs(){
+  mapViewPrefs={useSavedOnLoad:false,homeK:null,savedView:null};
+  try{localStorage.removeItem(MAP_VIEW_STORAGE_KEY);}catch(e){}
+  syncZoomPrefsUI();
+}
+function applySavedMapView(opts={}){
+  if(isCompactLayout())return false;
+  if(!mapViewPrefs.useSavedOnLoad||!mapViewPrefs.savedView||!zoomBeh||!baseSvg||!mapG||!dotG)return false;
+  const {k,x,y}=mapViewPrefs.savedView;
+  const t=d3.zoomIdentity.translate(x,y).scale(Math.max(0.1,Math.min(25,k)));
+  fitTransform=t;
+  currentScale=t.k;currentTx=t.x;currentTy=t.y;
+  userHasZoomed=true;
+  const dur=opts.duration!==undefined?opts.duration:0;
+  if(dur>0)baseSvg.transition().duration(dur).call(zoomBeh.transform,t);
+  else{
+    baseSvg.call(zoomBeh.transform,t);
+    mapG.attr('transform',t);
+    dotG.attr('transform',t);
+  }
+  updateZoomLevel(t.k);
+  drawCountryLabels();
+  renderDots();
+  if(animOn&&linesOn)drawCrowdSecRockets();
+  return true;
+}
+function applyInitialMapView(){
+  if(!isCompactLayout()&&applySavedMapView({duration:0}))return true;
+  fitMapToServerHome({duration:0,resetUser:false});
+  return false;
+}
+// Home: Weltübersicht mit Server im sichtbaren Bereich (wie CrowdSec Console / Bild 2)
+function fitMapToServerHome(opts={}){
+  if(!zoomBeh||!proj)return;
+  setupProj();
+  const srv=proj([SERVER_LON,SERVER_LAT]);
+  if(!srv)return;
+  const[sx,sy]=srv;
+  const {xFrac,yFrac,tyNudge,defaultK}=getHomeFitParams();
+  const k=opts.k??mapViewPrefs.homeK??defaultK;
+  const ins=getHomeViewInsets();
+  const panelL=getMapPanelInsetLeft();
+  const visW=Math.max(80,W-panelL-ins.r);
+  const visH=Math.max(80,H-ins.t-ins.b);
+  const cx=panelL+visW*xFrac;
+  const cy=ins.t+visH*yFrac;
+  const tx=cx-sx*k;
+  const ty=cy-sy*k-tyNudge;
+  homeTransform=d3.zoomIdentity.translate(tx,ty).scale(k);
+  fitTransform=homeTransform;
+  currentScale=k;currentTx=tx;currentTy=ty;
+  const dur=opts.duration!==undefined?opts.duration:650;
+  if(dur>0){
+    baseSvg.transition().duration(dur).ease(d3.easeCubicInOut).call(zoomBeh.transform,homeTransform);
+  }else{
+    baseSvg.call(zoomBeh.transform,homeTransform);
+    mapG.attr('transform',homeTransform);
+    dotG.attr('transform',homeTransform);
+  }
+  updateZoomLevel(k);
+  if(opts.resetUser!==false)userHasZoomed=false;
+}
+function scheduleHomeFit(){
+  const run=()=>{if(!userHasZoomed)applyInitialMapView();};
+  requestAnimationFrame(()=>requestAnimationFrame(run));
+}
+
+// Optional: alle Angriffspunkte einrahmen (nicht Standard-Start)
+function fitMapToPoints(){
+  if(!attackData.length)return;
+  const pts=attackData.map(d=>proj([d.lon,d.lat])).filter(Boolean);
+  if(!pts.length)return;
+  const srv=proj([SERVER_LON,SERVER_LAT]);
+  if(srv)pts.push(srv);
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs);
+  const y0=Math.min(...ys),y1=Math.max(...ys);
+  const pad=window.innerWidth<=680?30:80; // less padding on mobile
+  const rangeX=x1-x0||1,rangeY=y1-y0||1;
+  const scaleX=(W-pad*2)/rangeX;
+  const scaleY=(H-pad*2)/rangeY;
+  let k=Math.max(0.1,Math.min(scaleX,scaleY,8));
+  k=Math.max(FIT_MIN_SCALE,Math.min(k*FIT_ZOOM_BOOST,8));
+  if(window.innerWidth<=680){
+    const minFill=Math.max(W/650,H/350);
+    k=Math.max(k,minFill);
+  }
+  const cx=(x0+x1)/2,cy=(y0+y1)/2;
+  const tx=W/2-cx*k,ty=H/2-cy*k;
+  fitTransform=d3.zoomIdentity.translate(tx,ty).scale(k);
+  baseSvg.transition().duration(800).ease(d3.easeCubicInOut)
+    .call(zoomBeh.transform,fitTransform);
+}
+
+function renderDots(){
+  dotG.selectAll('.adot,.cluster-dot,.city-map-label').remove();
+  const ik=1/currentScale;
+  const data=getDisplayAttackData();
+
+  // Cluster nur bei Animation an + weit rausgezoomt; sonst Städte-Punkte sichtbar
+  const useCluster=animOn&&currentScale<=1.5;
+
+  const dots=useCluster ? getClusteredDots(data) : data.map(d=>{
+    const pt=proj([d.lon,d.lat]);
+    return pt?{...d,_px:pt[0],_py:pt[1],_cluster:1}:null;
+  }).filter(Boolean);
+
+  const _renderedCityLabels = new Set();
+  dots.forEach(d=>{
+    const px=d._px, py=d._py;
+    if(px==null||py==null)return;
+    const col=scenarioColor(d.scenario);
+    const isCluster=useCluster&&(d._cluster||1)>1;
+
+    if(isCluster){
+      const sr=Math.min(4+Math.log(d.count+1)*0.6,8);
+      dotG.append('circle').attr('class','cluster-dot')
+        .attr('cx',px).attr('cy',py)
+        .attr('r',sr*ik).attr('data-sr',sr)
+        .attr('fill',col)
+        .attr('stroke',col).attr('stroke-width',1.1*ik).attr('opacity',0.95)
+        .on('click',function(ev){ev.stopPropagation();selectDot(ev,this,d);})
+        .on('mouseover',(ev)=>showTip(ev,d)).on('mouseout',hideTip);
+      // Tiny count number inside
+      const fs=sr*0.75*ik;
+      dotG.append('text').attr('class','cluster-dot')
+        .attr('x',px).attr('y',py+fs*0.38)
+        .attr('text-anchor','middle')
+        .attr('fill','rgba(0,0,0,0.9)')
+        .attr('font-size',`${fs}px`)
+        .attr('font-family','Orbitron,monospace')
+        .attr('font-weight','900')
+        .attr('pointer-events','none')
+        .text(d._cluster);
+    } else {
+      const sr=Math.min(3+Math.log(d.count+1)*0.7,7);
+      dotG.append('circle').attr('class','adot')
+        .attr('cx',px).attr('cy',py).attr('r',sr*ik).attr('data-sr',sr)
+        .attr('fill',col).attr('stroke',col).attr('stroke-width',1.2*ik).attr('opacity',0.95)
+        .on('click',function(ev){ev.stopPropagation();selectDot(ev,this,d);})
+        .on('mouseover',(ev)=>showTip(ev,d)).on('mouseout',hideTip);
+      {
+        const cityPx=cityLabelScreenPx();
+        if(cityPx&&d.city&&!_renderedCityLabels.has(d.city)){
+          _renderedCityLabels.add(d.city);
+          dotG.append('text').attr('class','city-map-label')
+            .attr('x',px+(sr+2)*ik).attr('y',py+3*ik)
+            .attr('fill',col)
+            .attr('font-size',`${labelPxToSvg(cityPx)}px`)
+            .attr('font-family','Share Tech Mono,monospace')
+            .attr('pointer-events','none')
+            .text(translateCity(d.city));
+        }
+      }
+    }
+  });
+  drawServerDots();
+  drawCountryLabels();
+  updateCountryFills();
+  if(!animOn||!linesOn)clearArcCanvas();
+  if(selectedDot){dotG.selectAll('.sel-ring').remove();}
+}
+
+function countColor(n){if(n>=20)return'#f85149';if(n>=10)return'#ff6a3d';if(n>=5)return'#e3b341';return'#3fb950';}
+
+// ── WHITELIST STATUS BADGE ──
+function loadShowOwnIpPrefs(){
+  try{
+    const raw=localStorage.getItem(SHOW_OWN_IP_STORAGE_KEY);
+    if(raw===null)return;
+    showOwnIp=raw!=='0'&&raw!=='false';
+  }catch(e){}
+  syncWlIpToggleUI();
+}
+function persistShowOwnIpPrefs(){
+  try{localStorage.setItem(SHOW_OWN_IP_STORAGE_KEY,showOwnIp?'1':'0');}catch(e){}
+}
+function displayOwnIp(ip){
+  if(showOwnIp)return ip||'—';
+  return '••••••••';
+}
+function syncWlIpToggleUI(){
+  document.querySelectorAll('.wl-ip-toggle').forEach(btn=>{
+    btn.classList.toggle('on',showOwnIp);
+    btn.setAttribute('aria-pressed',showOwnIp?'true':'false');
+    btn.title=t('show_own_ip_title');
+  });
+  document.querySelectorAll('.wl-ip-toggle-lbl').forEach(el=>{
+    el.textContent=showOwnIp?t('show_own_ip_on'):t('show_own_ip_off');
+  });
+}
+function toggleShowOwnIp(){
+  showOwnIp=!showOwnIp;
+  persistShowOwnIpPrefs();
+  syncWlIpToggleUI();
+  if(lastWhitelistData)renderWhitelistBadge(lastWhitelistData);
+  else fetchWhitelistStatus();
+}
+function setupWlIpToggle(){
+  document.querySelectorAll('.wl-ip-toggle').forEach(btn=>{
+    btn.addEventListener('click',toggleShowOwnIp);
+  });
+}
+function renderWhitelistBadge(d){
+  const dot=document.getElementById('wl-dot');
+  const txt=document.getElementById('wl-text');
+  const mobDot=document.getElementById('mob-wl-dot');
+  const mobTxt=document.getElementById('mob-wl-text');
+  if(!dot||!txt)return;
+  if(!d){
+    dot.style.background='rgba(160,255,216,0.15)';
+    txt.style.color='rgba(160,255,216,0.25)';
+    txt.textContent=t('wl_na');
+    txt.title='';
+    if(mobDot)mobDot.style.background='rgba(160,255,216,0.15)';
+    if(mobTxt){mobTxt.style.color='rgba(160,255,216,0.25)';mobTxt.textContent='🛡️ n/a';}
+    return;
+  }
+  const ip=d.ip||'';
+  const status=d.status||'unbekannt';
+  const check=d.last_check||'';
+  const changed=d.last_change||'';
+  const disp=displayOwnIp(ip);
+  let color,label,mobLabel;
+  if(!showOwnIp&&!ip){
+    color='rgba(160,255,216,0.3)';label=t('wl_ip_hidden');mobLabel=label;
+  }else if(status==='ok'){
+    color='var(--ok)';label=`🛡️ ${disp} ✓`;mobLabel=`🛡️ ${disp}`;
+  }else if(status==='aktualisiert'){
+    color='var(--accent)';
+    label=showOwnIp?t('wl_updated',ip):`🔄 ${disp} ${currentLang==='de'?'aktualisiert':'updated'}`;
+    mobLabel=`🛡️ ${disp}`;
+  }else if(status==='fehler'){
+    color='var(--danger)';label=t('wl_err');mobLabel='🛡️ !';
+  }else{
+    color='rgba(160,255,216,0.3)';label=`🛡️ ${disp}`;mobLabel=`🛡️ ${disp}`;
+  }
+  dot.style.background=color;
+  dot.style.boxShadow=status==='fehler'?`0 0 5px ${color}`:'none';
+  txt.style.color=color;
+  txt.textContent=label;
+  txt.title=showOwnIp?t('wl_check',check,changed):t('show_own_ip_title');
+  if(mobDot){mobDot.style.background=color;mobDot.style.boxShadow=status==='fehler'?`0 0 4px ${color}`:'none';}
+  if(mobTxt){mobTxt.style.color=color;mobTxt.textContent=mobLabel;mobTxt.title=txt.title;}
+}
+async function fetchWhitelistStatus(){
+  try{
+    const base=EXPORTER_URL.replace(/\/metrics.*$/,'');
+    const res=await fetch(base+'/whitelist-status',{cache:'no-store'});
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    lastWhitelistData=await res.json();
+    renderWhitelistBadge(lastWhitelistData);
+  }catch(e){
+    lastWhitelistData=null;
+    renderWhitelistBadge(null);
+  }
+}
+
+// ── CONTEXT MENU ──
+let ctxCurrentIP='';
+
+function showCtx(ev,d){
+  const m=document.getElementById('ctx-menu');
+  ctxCurrentIP=d.ip||'';
+  const cityStr=d.city&&d.city!=='-'?` · 📍${translateCity(d.city)}`:'';
+  document.getElementById('ctx-title').textContent=`${FLAG[d.country]||'🌐'} ${d.ip}${cityStr}`;
+  document.getElementById('c-cti').href=`https://app.crowdsec.net/cti/${d.ip}`;
+  document.getElementById('c-shodan').href=`https://www.shodan.io/host/${d.ip}`;
+  document.getElementById('c-censys').href=`https://search.censys.io/hosts/${d.ip}`;
+  const lookup=d.iprange&&d.iprange!=='-'&&d.iprange?d.iprange:d.ip;
+  document.getElementById('c-ripe').href=`https://apps.db.ripe.net/db-web-ui/query?bflag=true&dflag=false&rflag=false&source=GRS&searchtext=${lookup}`;
+  document.getElementById('c-ripes').href=`https://stat.ripe.net/${lookup}`;
+  document.getElementById('c-crim').href=`https://www.criminalip.io/asset/report/${d.ip}`;
+  // First show offscreen to measure height
+  m.style.visibility='hidden';
+  m.style.display='block';
+  const mw=m.offsetWidth||165;
+  const mh=m.offsetHeight||260;
+  const vw=window.innerWidth;
+  const vh=window.innerHeight;
+  let x=ev.clientX+10;
+  let y=ev.clientY-10;
+  if(x+mw>vw-10) x=ev.clientX-mw-10;
+  if(x<10) x=10;
+  if(y+mh>vh-10) y=vh-mh-10;
+  if(y<60) y=60;
+  m.style.left=x+'px';
+  m.style.top=y+'px';
+  m.style.visibility='visible';
+}
+
+async function unbanIPDirect(ip, btn){
+  if(!ip)return;
+  if(!confirm(t('unban_confirm1',ip)))return;
+  await new Promise(r=>setTimeout(r,100));
+  if(!confirm(t('unban_confirm2',ip)))return;
+
+  // Button direkt nutzen
+  const targetBtn = btn || document.querySelector(`.feed-unban-btn[data-ip="${ip}"]`);
+  const feedItem = targetBtn ? targetBtn.closest('.feed-item') : null;
+
+  if(targetBtn){targetBtn.textContent='⏳';targetBtn.disabled=true;}
+
+  try{
+    const base=EXPORTER_URL.replace(/\/metrics.*$/,'');
+    const headers={'Content-Type':'application/json'};
+    if(UNBAN_API_TOKEN&&UNBAN_API_TOKEN!=='UNBAN_TOKEN_PLACEHOLDER'){
+      headers['X-API-Token']=UNBAN_API_TOKEN;
+    }
+    const res=await fetch(`${base}/unban`,{
+      method:'POST',
+      headers,
+      body:JSON.stringify({ip}),
+    });
+    const data=await res.json();
+    if(data.success){
+      // Grüner Haken anzeigen
+      if(targetBtn){targetBtn.textContent='✅';targetBtn.style.color='var(--ok)';}
+      // Nach 1.5s den Feed-Eintrag sanft ausblenden und entfernen
+      setTimeout(()=>{
+        if(feedItem){
+          feedItem.style.transition='opacity 0.5s';
+          feedItem.style.opacity='0';
+          setTimeout(()=>{
+            feedItem.remove();
+            // feedData aktualisieren
+            feedData=feedData.filter(d=>!(d.ip===ip));
+            localUnbanned.add(ip);
+          },500);
+        }
+      },1500);
+    } else {
+      if(targetBtn){targetBtn.textContent='❌';targetBtn.style.color='var(--danger)';targetBtn.disabled=false;}
+      alert(`${t('error_prefix')}${data.message||t('unban_fail')}`);
+    }
+  }catch(e){
+    if(targetBtn){targetBtn.textContent='❌';targetBtn.style.color='var(--danger)';targetBtn.disabled=false;}
+    alert(t('unban_conn'));
+  }
+}
+
+async function unbanIP(){
+  if(ctxCurrentIP) await unbanIPDirect(ctxCurrentIP);
+}
+function closeCtxOnce(e){
+  const m=document.getElementById('ctx-menu');
+  const t=document.getElementById('tip');
+  if(m.style.display==='block'&&!m.contains(e.target))m.style.display='none';
+  if(tipPinned&&t.style.display==='block'&&!t.contains(e.target))closeTip();
+}
+// ctx-menu close button
+
+document.getElementById('ctx-close').onclick=()=>{document.getElementById('ctx-menu').style.display='none';};
+document.addEventListener('click', closeCtxOnce, true);
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    document.getElementById('ctx-menu').style.display='none';
+    closeTip();
+  }
+});
+// Click on map background = clear selection
+document.getElementById('base-svg').addEventListener('click',()=>{
+  clearSelection();
+});
+
+const tipEl=document.getElementById('tip');
+const tipCloseBtn=document.getElementById('tip-close');
+let tipPinned=false;
+function closeTip(){tipPinned=false;tipEl.classList.remove('tip-pinned');tipEl.style.display='none';}
+function tipBodyHTML(d,pinned){
+  const f=FLAG[d.country]||'🌐';
+  const asnStr=d.asnumber?`AS${d.asnumber}`:'';
+  const subnetStr=d.iprange&&d.iprange!=='-'?d.iprange:'';
+  const timeStr=d.time_de||d.time_iso||'';
+  const cityStr=d.city&&d.city!=='-'?translateCity(d.city):'';
+  const foot=pinned?'':`<div style="color:rgba(0,229,200,0.25);font-size:8px;margin-top:5px;border-top:1px solid rgba(0,229,200,0.1);padding-top:4px;letter-spacing:1px;">${t('tip_click')}</div>`;
+  return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">
+      <span style="color:#f85149;font-size:12px;">${d.ip}</span>
+      <span style="color:rgba(255,34,68,0.5);font-size:10px;">${d.count||1}×</span>
+    </div>
+    ${subnetStr?`<div style="color:rgba(160,255,216,0.4);font-size:9px;margin-bottom:3px;">📡 ${subnetStr}</div>`:''}
+    <div style="margin-bottom:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+      <span style="color:#ff6a3d;font-size:10px;">${f} ${countryDisplayName(d.country)}</span>
+      ${cityStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(255,200,100,0.95);font-size:10px;">${cityStr}</span>`:''}
+      ${asnStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(0,229,200,0.5);font-size:9px;">${asnStr}</span>`:''}
+    </div>
+    ${d.asname?`<div style="color:rgba(160,255,216,0.55);font-size:9px;margin-bottom:3px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.asname}</div>`:''}
+    <div style="color:rgba(160,255,216,0.6);font-size:9px;margin-bottom:${timeStr?'3px':'0'};">⚡ ${d.scenario}</div>
+    ${timeStr?`<div style="color:rgba(0,229,200,0.35);font-size:9px;">🕐 ${timeStr}</div>`:''}
+    ${foot}`;
+}
+function positionTip(ev){
+  const tw=tipEl.offsetWidth||220;
+  const th=tipEl.offsetHeight||120;
+  let x=ev.clientX+14,y=ev.clientY-10;
+  if(x+tw>window.innerWidth-10)x=ev.clientX-tw-10;
+  if(y+th>window.innerHeight-10)y=ev.clientY-th-10;
+  if(y<60)y=60;
+  tipEl.style.left=x+'px';
+  tipEl.style.top=y+'px';
+}
+function showTip(ev,d,pinned=false){
+  tipPinned=pinned;
+  tipEl.classList.toggle('tip-pinned',pinned);
+  const body=document.getElementById('tip-content');
+  if(body)body.innerHTML=tipBodyHTML(d,pinned);
+  tipEl.style.display='block';
+  positionTip(ev);
+}
+function hideTip(){if(tipPinned)return;tipEl.style.display='none';}
+if(tipCloseBtn)tipCloseBtn.onclick=e=>{e.stopPropagation();closeTip();};
+
+// ── FEED & LISTS ──
+function feedItemHTML(d){
+  const f=FLAG[d.country]||'🌐';
+  const timeStr=d.time_de||d.time_iso||'—';
+  const asnStr=d.asnumber?`AS${d.asnumber}`:'';
+  const subnetStr=d.iprange&&d.iprange!=='-'?d.iprange:'';
+  const cityStr=d.city&&d.city!=='-'?translateCity(d.city):'';
+  return `<div class="feed-item" style="cursor:default;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">
+      <div class="feed-ip" style="flex:1;">${d.ip}</div>
+      <button class="feed-action-btn feed-unban-btn" data-ip="${d.ip}"
+        onclick="event.stopPropagation();unbanIPDirect('${d.ip}',this);"
+        title="${d.active_ban ? t('unban_active') : t('unban_history')}"
+        style="font-size:16px;">${d.active_ban?'🚫':'📋'}</button>
+      <button class="feed-action-btn feed-lookup-btn"
+        onclick="event.stopPropagation();openCtxFeed('${d.ip}','${d.country}','${d.scenario}',1,event,'${d.iprange||''}');"
+        title="${t('lookup_title')}">🔍</button>
+      <button class="feed-action-btn feed-map-btn"
+        onclick="event.stopPropagation();jumpToPoint(${d.lat},${d.lon},'${d.ip}','${d.country}','${d.scenario}','${d.iprange||''}',event,'${(d.city||'').replace(/'/g,"\\'")}');"
+        title="${t('map_title')}">↗</button>
+    </div>
+    <div style="font-size:clamp(7px,0.85vw,9px);color:rgba(160,255,216,0.35);margin-top:1px;">
+      ${subnetStr?`${t('subnet_icon')} ${subnetStr}`:''}
+    </div>
+    <div class="feed-meta" style="margin-top:2px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+      <span class="feed-country">${f} ${countryDisplayName(d.country)}</span>
+      ${cityStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(255,200,100,0.95);font-size:clamp(8px,0.95vw,10px);font-weight:500;">${cityStr}</span>`:''}
+      ${asnStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(0,229,200,0.45);font-size:clamp(7px,0.8vw,9px);">${asnStr}</span>`:''}
+    </div>
+    <div style="font-size:clamp(7px,0.85vw,9px);color:rgba(160,255,216,0.5);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.asname}">${d.asname||''}</div>
+    <div class="feed-scenario" style="margin-top:2px;cursor:pointer;" onclick="event.stopPropagation();filterByScenario('${d.scenario.replace(/'/g,"\\'")}');" title="${t('filter_scenario')}">${t('scenario_icon')} ${d.scenario}</div>
+    <div style="font-size:clamp(7px,0.8vw,9px);color:rgba(0,229,200,0.32);margin-top:3px;letter-spacing:0.5px;">${t('time_icon')} ${timeStr}</div>
+  </div>`;
+}
+function openCtxFeed(ip,country,scenario,count,ev,iprange){ev.stopPropagation();showCtx(ev,{ip,country,scenario,count,iprange});}
+
+// ── SELECTED DOT ──
+function clearSelection(){
+  if(selectedEl){
+    // Remove highlight ring
+    dotG.selectAll('.sel-ring').remove();
+    selectedEl=null; selectedDot=null;
+  }
+  document.getElementById('ctx-menu').style.display='none';
+  closeTip();
+}
+
+function drawSelectionRing(px,py){
+  dotG.selectAll('.sel-ring').remove();
+  const ik=1/currentScale;
+  // Outer glow ring - stays permanently until deselected
+  dotG.append('circle').attr('class','sel-ring')
+    .attr('cx',px).attr('cy',py)
+    .attr('r',12*ik).attr('fill','none')
+    .attr('stroke','#00e5c8').attr('stroke-width',1.5*ik)
+    .attr('opacity',0.9)
+    .attr('stroke-dasharray',`${3*ik} ${2*ik}`);
+  dotG.append('circle').attr('class','sel-ring')
+    .attr('cx',px).attr('cy',py)
+    .attr('r',18*ik).attr('fill','none')
+    .attr('stroke','#00e5c8').attr('stroke-width',0.5*ik)
+    .attr('opacity',0.4);
+}
+
+function selectDot(ev,el,d){
+  const isSame = selectedEl===el;
+
+  if(isSame){
+    if(tipPinned||document.getElementById('ctx-menu').style.display==='block'){
+      clearSelection();
+    }else{
+      showTip(ev,d,true);
+      showCtx(ev,d);
+    }
+    return;
+  }
+
+  selectedEl=el;
+  selectedDot=d;
+  document.getElementById('ctx-menu').style.display='none';
+  tipPinned=false;
+
+  const px=parseFloat(el.getAttribute('cx'));
+  const py=parseFloat(el.getAttribute('cy'));
+  drawSelectionRing(px,py);
+
+  showTip(ev,d,true);
+  showCtx(ev,d);
+}
+
+// Update selection ring on zoom
+function updateSelectionRing(){
+  if(!selectedEl)return;
+  const px=parseFloat(selectedEl.getAttribute('cx'));
+  const py=parseFloat(selectedEl.getAttribute('cy'));
+  drawSelectionRing(px,py);
+}
+
+function jumpToPoint(lat,lon,ip,country,scenario,iprange,ev,city){
+  ev.stopPropagation();
+  if(!lat&&!lon){return;}
+
+  // Calculate target screen position
+  const pt=proj([lon,lat]);
+  if(!pt){showCtx(ev,{ip,country,scenario,count:1,iprange,city});return;}
+
+  const targetScale=6; // zoom level to jump to
+  const cx=W/2, cy=H/2;
+
+  // Compute new translate so point ends up in center
+  const tx=cx - pt[0]*targetScale;
+  const ty=cy - pt[1]*targetScale;
+  const newTransform=d3.zoomIdentity.translate(tx,ty).scale(targetScale);
+
+  // Animate zoom
+  baseSvg.transition().duration(700).ease(d3.easeCubicInOut)
+    .call(zoomBeh.transform, newTransform);
+
+  // Flash highlight ring after zoom lands
+  setTimeout(()=>{
+    flashPoint(pt[0],pt[1],ip,country,scenario,iprange,city);
+  },750);
+}
+
+function flashPoint(px,py,ip,country,scenario,iprange,city){
+  // Draw a pulsing highlight ring on the dot
+  const g=dotG.append('g').attr('class','flash-ring');
+  const col='#00e5c8';
+
+  // Outer ring that expands and fades
+  const ik=1/currentScale;
+  const ring=g.append('circle')
+    .attr('cx',px).attr('cy',py).attr('r',8*ik)
+    .attr('fill','none')
+    .attr('stroke',col)
+    .attr('stroke-width',2*ik)
+    .attr('opacity',1);
+
+  // Animate: expand + fade out
+  ring.transition().duration(600).ease(d3.easeLinear)
+    .attr('r',28*ik).attr('opacity',0)
+    .on('end',function(){
+      ring.transition().duration(600)
+        .attr('r',8*ik).attr('opacity',1)
+        .on('end',function(){
+          ring.transition().duration(600)
+            .attr('r',28*ik).attr('opacity',0)
+            .on('end',function(){
+              g.remove();
+            });
+        });
+    });
+
+  // Small label popup above the point
+  const ik2=1/currentScale;
+  const popup=dotG.append('g').attr('class','flash-popup');
+  popup.append('rect')
+    .attr('x',px-45*ik2).attr('y',py-32*ik2)
+    .attr('width',90*ik2).attr('height',20*ik2)
+    .attr('rx',3*ik2)
+    .attr('fill','rgba(0,12,30,0.92)')
+    .attr('stroke','rgba(0,229,200,0.4)')
+    .attr('stroke-width',0.8*ik2);
+  popup.append('text')
+    .attr('x',px).attr('y',py-18*ik2)
+    .attr('text-anchor','middle')
+    .attr('fill','#00e5c8')
+    .attr('font-size',`${8*ik2}px`)
+    .attr('font-family','Share Tech Mono,monospace')
+    .text(city&&city!=='-'?`${ip} · ${city}`:ip);
+
+  // Fade popup out after 2.5s
+  setTimeout(()=>{
+    popup.transition().duration(500).attr('opacity',0).on('end',()=>popup.remove());
+  },2500);
+}
+
+function setFeedSort(mode){
+  feedSort=mode;
+  feedPage=0;
+  ['fsort-new','fsort-old','mob-fsort-new','mob-fsort-old'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.classList.toggle('active',(id.includes('new')&&mode==='newest')||(id.includes('old')&&mode==='oldest'));
+  });
+  renderFeed();
+}
+
+function setFeedPage(p){
+  feedPage=p;
+  renderFeed();
+  // Scroll feed to top
+  const f=document.getElementById('feed');
+  if(f)f.scrollTop=0;
+  const mf=document.getElementById('mob-panel');
+  if(mf)mf.scrollTop=0;
+}
+
+// ── UTILS ──
+</script>
+<script src="assets/js/map.js"></script>
+<script src="assets/js/map-core.js"></script>
+<script src="assets/js/rockets.js"></script>
+<script src="assets/js/rockets-core.js"></script>
+<script src="assets/js/rocket-styles.js"></script>
+<script src="assets/js/feed-core.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
