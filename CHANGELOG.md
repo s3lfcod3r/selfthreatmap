@@ -2,6 +2,22 @@
 
 ---
 
+## v2.4.0 — 27.06.2026
+
+### 📦 Offline-fähig (kein CDN mehr)
+- **d3, topojson & Weltkarten-Daten lokal gebündelt** (`assets/vendor/`) statt von cloudflare/jsdelivr — läuft jetzt **ohne Internet**, schneller, kein Datenabfluss an Dritte. (Live verifiziert: 177 Länder gezeichnet, 0 CDN-Requests.)
+
+### ⚡ `/metrics` komprimiert
+- nginx `gzip_proxied any;` — proxied Antworten (`/metrics`, `/drops`, `/config`) werden jetzt gzip-komprimiert (vorher nicht). Deutlich weniger Übertragung pro Refresh.
+
+### 📱 Sprach-Umschalter am Handy
+- Der 12-Sprachen-Wähler ist jetzt auch in der mobilen Leiste (Dropdown), synchron mit dem Desktop-Wähler.
+
+### ♿ Pinch-Zoom erlaubt
+- Viewport blockiert das Hineinzoomen am Handy nicht mehr (`user-scalable=no` entfernt).
+
+---
+
 ## v2.3.2 — 27.06.2026
 
 ### 🐛 Fix: Sprach- & Theme-Dropdown ließen sich nicht öffnen

@@ -220,10 +220,10 @@ function init(){
         showErr('SERVER_LAT / SERVER_LON fehlen oder sind ungültig — in Docker/Unraid setzen, Container neu starten. LAT/LON nicht vertauschen.');
       }
       setupProj();
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js');
+      await loadScript('assets/vendor/topojson.min.js');
       const lsEl=document.getElementById('ls');
       if(lsEl){lsEl.dataset.busy='1';lsEl.textContent=t('load_map');}
-      const r=await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+      const r=await fetch('assets/vendor/countries-110m.json');
       worldData=await r.json();
       drawBaseMap();
       setupZoom();

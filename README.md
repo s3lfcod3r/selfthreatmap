@@ -7,7 +7,7 @@
 **Live attack map straight from your local CrowdSec database**
 **Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank**
 
-[![Version](https://img.shields.io/badge/version-v2.3.1-33a78c?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.4.0-33a78c?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Docker%20%7C%20Unraid-1db8d4?style=flat-square)](#-installation)
 [![Python](https://img.shields.io/badge/python-3.12-9dbdd0?style=flat-square&logo=python&logoColor=white)](crowdsec_exporter.py)
@@ -35,6 +35,7 @@
 - 🌐 **12 European languages** (DE, EN, FR, ES, IT, PT, NL, PL, SV, DA, CS, EL) with an in-app flag dropdown — live switch, remembered in the browser · 📱 fully responsive
 - 🌈 **10 color themes** — Cyan, Alarm, Matrix, Amber, Arctic, Cyber, Inferno, Mono, Synth, Ocean (live-switchable)
 - 🔁 **Replay loop** — play the whole time window of attacks on an endless loop
+- 📦 **Fully self-contained** — d3 & world-map data bundled locally; works offline, no external CDN calls
 - 🎨 **Self design** — dark Teal/Cyan theme from the shared Self brand kit
 
 ## 🚀 Installation
@@ -113,6 +114,7 @@ The dashboard can lift CrowdSec bans via the Docker socket — treat port **8080
 - 🌐 **12 europäische Sprachen** (DE, EN, FR, ES, IT, PT, NL, PL, SV, DA, CS, EL) mit Flaggen-Dropdown in der App — live umschaltbar, im Browser gemerkt · 📱 voll responsive
 - 🌈 **10 Farbthemen** — Cyan, Alarm, Matrix, Amber, Arctic, Cyber, Inferno, Mono, Synth, Ocean (live umschaltbar)
 - 🔁 **Replay-Schleife** — das ganze Zeitfenster der Angriffe als Endlosschleife abspielen
+- 📦 **Komplett eigenständig** — d3 & Weltkarten-Daten lokal gebündelt; läuft offline, keine externen CDN-Aufrufe
 - 🎨 **Self-Design** — dunkles Teal/Cyan-Theme aus dem gemeinsamen Self-Brand-Kit
 
 ### 🚀 Installation (Unraid)
