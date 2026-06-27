@@ -12,7 +12,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SelfThreatMap — Live Threat Map</title>
 <!-- Self-Schild Favicon (Teal) -->
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23080c11'/%3E%3Cpath d='M16 3 L28 8 L28 18 C28 24 22 29 16 31 C10 29 4 24 4 18 L4 8 Z' fill='none' stroke='%2333a78c' stroke-width='2'/%3E%3Cpath d='M16 3 L28 8 L28 18 C28 24 22 29 16 31 C10 29 4 24 4 18 L4 8 Z' fill='%2333a78c30'/%3E%3Cpath d='M16 12 l5 8 -5 5 -5 -5 Z' fill='%2343d3ad'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="assets/logo/shield.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
@@ -875,9 +875,9 @@
   <div id="map-col">
     <div id="map-wrap">
       <div id="map-title-overlay">
-        <svg id="h-logo" viewBox="0 0 64 72" width="15" height="17" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(51,167,140,0.6))"><defs><linearGradient id="hl-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43d3ad"/><stop offset=".55" stop-color="#33a78c"/><stop offset="1" stop-color="#1f7763"/></linearGradient></defs><path d="M32 2 L60 13 V36 C60 54 47 66 32 70 C17 66 4 54 4 36 V13 Z" fill="url(#hl-sh)" stroke="#bcd9e9" stroke-opacity=".45" stroke-width="1.6"/><path d="M32 2 L32 70 C17 66 4 54 4 36 V13 Z" fill="#0d1117" fill-opacity=".12"/><path d="M32 24 l9 16 -9 9 -9 -9 Z" fill="#eef4f7"/><circle cx="47" cy="20" r="4.5" fill="#ff5a4d" stroke="#0d1117" stroke-width="1.2"/></svg>
+        <img id="h-logo" src="assets/logo/shield.png" alt="" width="16" height="20" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(51,167,140,0.55))">
         <span id="h-title">Self<span>ThreatMap</span></span>
-        <span id="map-version-badge">v2.3.0</span>
+        <span id="map-version-badge">v2.3.1</span>
       </div>
       <svg id="base-svg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
       <canvas id="arc-canvas"></canvas>
@@ -1206,7 +1206,7 @@ let SERVER_NAME_MAP = 'MEIN-SERVER';
 // Ab hier nichts mehr ändern
 // ============================================================
 
-const APP_VERSION  = 'v2.3.0';
+const APP_VERSION  = 'v2.3.1';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;

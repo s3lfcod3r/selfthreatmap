@@ -2,6 +2,14 @@
 
 ---
 
+## v2.3.1 — 27.06.2026
+
+### 🛡️ Echtes Self-Schild
+- Header-Logo, Favicon & README nutzen jetzt das **echte facettierte Self-Schild** aus dem Brand-Kit (transparent, `assets/logo/shield.png`) statt der nachgezeichneten Version
+- **Docker/Unraid-Container-Icon** = offizielles Self-Avatar (Schild auf Dunkel + Teal-Glow, 512×512)
+
+---
+
 ## v2.3.0 — 27.06.2026
 
 ### 🔥 Live Firewall Drops — `/drops` API (aus Railline-Fork portiert)
