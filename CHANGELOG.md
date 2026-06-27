@@ -2,6 +2,22 @@
 
 ---
 
+## v2.1.0 — 27.06.2026
+
+### 🎨 Logo & Wortmarke
+- Eigenes SelfThreatMap-Logo (Self-Schild mit Globus-/Radar-Motiv + Angriffs-Ping): `assets/logo/selfthreatmap-mark.svg` + `-logo.svg`
+- Logo-Mark im Karten-Header neben dem Schriftzug; README mit Logo
+
+### 🌈 10 Farbthemen
+- `THEMA`-Umschalter erweitert: Cyan, Alarm, Matrix, Amber **+ Arctic, Cyber, Inferno, Mono, Synth, Ocean**
+- Buttons brechen sauber um (Desktop + Mobile), alle live umschaltbar
+
+### 🔁 Loop-Modus (Replay-Schleife)
+- Neuer ⟳-Button in der Replay-Leiste: Zeitfenster läuft endlos in Schleife
+- Zustand wird gespeichert (localStorage); am Fensterende automatischer Neustart
+
+---
+
 ## v2.0.0 — 27.06.2026
 
 ### 🎨 Rebrand → SelfThreatMap (Self-Suite)

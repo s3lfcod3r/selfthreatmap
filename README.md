@@ -1,11 +1,13 @@
 <div align="center">
 
-# 🛡️ SelfThreatMap
+<img src="assets/logo/selfthreatmap-mark.svg" width="84" alt="SelfThreatMap logo"/>
+
+# SelfThreatMap
 
 **Live attack map straight from your local CrowdSec database**
 **Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank**
 
-[![Version](https://img.shields.io/badge/version-v2.0.0-33a78c?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.1.0-33a78c?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Docker%20%7C%20Unraid-1db8d4?style=flat-square)](#-installation)
 [![Python](https://img.shields.io/badge/python-3.12-9dbdd0?style=flat-square&logo=python&logoColor=white)](crowdsec_exporter.py)
@@ -31,6 +33,8 @@
 - 📊 **Sparkline**, Top-10, live feed with pagination & **CSV export**
 - 🛡️ **Dynamic IP whitelist** — auto-whitelists your own changing IP every 15 min (no self-ban)
 - 🌐 **Bilingual UI** (`LANGUAGE=de` / `en`) · 📱 fully responsive
+- 🌈 **10 color themes** — Cyan, Alarm, Matrix, Amber, Arctic, Cyber, Inferno, Mono, Synth, Ocean (live-switchable)
+- 🔁 **Replay loop** — play the whole time window of attacks on an endless loop
 - 🎨 **Self design** — dark Teal/Cyan theme from the shared Self brand kit
 
 ## 🚀 Installation
@@ -107,6 +111,8 @@ The dashboard can lift CrowdSec bans via the Docker socket — treat port **8080
 - 📊 **Sparkline**, Top-10, Live-Feed mit Pagination & **CSV-Export**
 - 🛡️ **Dynamische IP-Whitelist** — eigene wechselnde IP automatisch alle 15 Min whitelisten (kein Selbst-Ban)
 - 🌐 **Zweisprachig** (`LANGUAGE=de` / `en`) · 📱 voll responsive
+- 🌈 **10 Farbthemen** — Cyan, Alarm, Matrix, Amber, Arctic, Cyber, Inferno, Mono, Synth, Ocean (live umschaltbar)
+- 🔁 **Replay-Schleife** — das ganze Zeitfenster der Angriffe als Endlosschleife abspielen
 - 🎨 **Self-Design** — dunkles Teal/Cyan-Theme aus dem gemeinsamen Self-Brand-Kit
 
 ### 🚀 Installation (Unraid)

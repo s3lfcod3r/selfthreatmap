@@ -245,7 +245,19 @@ function advanceReplay(ts){
     renderDots();renderMapPanels();updateCountryFills();
   }
   if(animOn)drawReplayFrame(ts);else clearArcCanvas();
-  if(replayCursor>=replayWinEnd){replayPlaying=false;updateReplayControlsUI();}
+  if(replayCursor>=replayWinEnd){
+    if(typeof replayLoop!=='undefined'&&replayLoop&&replayWinEnd>replayWinStart){
+      // Endlosschleife: Zeitfenster von vorn abspielen
+      replayCursor=replayWinStart;
+      lastReplaySpawnTs=replayWinStart;
+      replayLastFrame=ts;
+      resetRockets();
+      clearSpawnedRocketKeys();
+      updateReplaySlider();
+    }else{
+      replayPlaying=false;updateReplayControlsUI();
+    }
+  }
 }
 function startAnimLoop(){
   if(animRAF)cancelAnimationFrame(animRAF);

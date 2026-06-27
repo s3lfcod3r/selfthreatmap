@@ -200,6 +200,12 @@ const THEMES={
   red:   {accent:'#ff4466',danger:'#ff0022',warn:'#ffaa00',ok:'#ff6688',dim:'rgba(255,68,102,0.2)', text:'#ffb0b8',server:'#ff6a3d',bg:'#100208'},
   matrix:{accent:'#3fb950',danger:'#44ff00',warn:'#88ff00',ok:'#00ffcc',dim:'rgba(0,255,136,0.15)',text:'#a0ffb8',server:'#00ff44',bg:'#020d06'},
   amber: {accent:'#ffaa00',danger:'#ff4400',warn:'#ffdd00',ok:'#aaff00',dim:'rgba(255,170,0,0.18)', text:'#ffd880',server:'#1db8d4',bg:'#0d0800'},
+  arctic:{accent:'#7fd4ff',danger:'#ff6a8a',warn:'#ffc06a',ok:'#7fe6c0',dim:'rgba(150,200,230,0.20)',text:'#eaf4fb',server:'#bcd9e9',bg:'#0a1016'},
+  cyber: {accent:'#b46aff',danger:'#ff4da6',warn:'#ffb000',ok:'#3fe0c0',dim:'rgba(180,120,255,0.20)',text:'#ead8ff',server:'#6ad0ff',bg:'#0e0a18'},
+  inferno:{accent:'#ff7a2d',danger:'#ff2d2d',warn:'#ffb000',ok:'#ffd23d',dim:'rgba(255,120,40,0.20)',text:'#ffd9c2',server:'#ff9a5a',bg:'#140a06'},
+  mono:  {accent:'#e6edf2',danger:'#ff5a5a',warn:'#d0d6db',ok:'#9aa6ae',dim:'rgba(200,210,220,0.16)',text:'#dfe6ea',server:'#bcc6cd',bg:'#0c0e10'},
+  synth: {accent:'#ff5ad0',danger:'#ff3d6a',warn:'#ffb000',ok:'#3fe0ff',dim:'rgba(255,90,200,0.20)',text:'#ffd8f0',server:'#7a6aff',bg:'#0d0a1a'},
+  ocean: {accent:'#22d3d3',danger:'#ff6a6a',warn:'#ffb000',ok:'#3fb9a0',dim:'rgba(80,180,200,0.20)',text:'#cfeefb',server:'#4ad0e0',bg:'#06121a'},
 };
 let currentTheme='cyan';
 
