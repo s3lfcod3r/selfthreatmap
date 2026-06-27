@@ -2,6 +2,17 @@
 
 ---
 
+## v2.1.1 — 27.06.2026
+
+### 🎨 Branding-Feinschliff
+- **Docker/Unraid-Icon** als echtes 512×512-PNG (Self-Schild mit Glow) — `unraid/icon.png`
+- **Header-Wortmarke** in echten Self-Farben: „Self" Ice (#9dbdd0), „ThreatMap" Teal (#33a78c), Orbitron 800; Logo-Mark als sauberes Self-Schild + Threat-Ping
+
+### 👁️ Live-Vorschau in den Einstellungen
+- Neues Vorschau-Canvas unter der Stil-Auswahl: zeigt den gewählten Bahn-Stil **animiert**, sofort beim Umschalten — man sieht direkt, wie der Angriff fliegt
+
+---
+
 ## v2.1.0 — 27.06.2026
 
 ### 🎨 Logo & Wortmarke

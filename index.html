@@ -34,11 +34,11 @@
     background:linear-gradient(to bottom,rgba(2,8,16,0.5) 0%,transparent 100%);
   }
   #map-title-overlay #h-title{
-    font-family:'Orbitron',monospace;font-size:clamp(8px,1.4vw,13px);font-weight:900;
-    color:var(--accent);text-shadow:0 0 14px var(--accent);
+    font-family:'Orbitron',monospace;font-size:clamp(8px,1.4vw,13px);font-weight:800;
+    color:#9dbdd0;text-shadow:0 0 14px rgba(51,167,140,0.5);
     letter-spacing:clamp(1px,0.3vw,3px);white-space:nowrap;
   }
-  #map-title-overlay #h-title span{color:var(--danger);}
+  #map-title-overlay #h-title span{color:#33a78c;}
   #map-version-badge{
     font-family:'Share Tech Mono',monospace;font-size:clamp(7px,0.75vw,9px);
     color:rgba(0,229,200,0.45);border:1px solid rgba(0,229,200,0.2);
@@ -807,6 +807,10 @@
             <option value="legacy">Minimal (kurzer Strich)</option>
           </select>
         </label>
+        <div class="settings-field" style="flex-direction:column;align-items:stretch;gap:4px">
+          <span style="font-size:9px;color:rgba(160,255,216,0.5);letter-spacing:1px">VORSCHAU — so fliegt der Angriff</span>
+          <canvas id="rstyle-preview" width="440" height="120" style="width:100%;height:78px;border:1px solid var(--dim);border-radius:6px;background:rgba(0,12,22,0.6)"></canvas>
+        </div>
         <label class="settings-field"><span id="set-lbl-tail">Schweif-Länge Neu (%)</span><input type="number" id="set-tail-classic" min="4" max="25" step="1"></label>
         <label class="settings-field"><span id="set-lbl-lane">Bahn-Abstand (px)</span><input type="number" id="set-lane-spread" min="0" max="30" step="1"></label>
         <label class="settings-field"><span id="set-lbl-max-arcs">Max. Console-Bögen</span><input type="number" id="set-max-arcs" min="10" max="500" step="10"></label>
@@ -849,9 +853,9 @@
   <div id="map-col">
     <div id="map-wrap">
       <div id="map-title-overlay">
-        <svg id="h-logo" viewBox="0 0 64 72" width="16" height="18" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 6px var(--accent))"><defs><linearGradient id="hl-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43d3ad"/><stop offset=".55" stop-color="#33a78c"/><stop offset="1" stop-color="#1f7763"/></linearGradient></defs><path d="M32 2 L60 13 V36 C60 54 47 66 32 70 C17 66 4 54 4 36 V13 Z" fill="url(#hl-sh)" stroke="#bcd9e9" stroke-opacity=".4" stroke-width="1.5"/><g fill="none" stroke="#0d1117" stroke-opacity=".30" stroke-width="1.6"><circle cx="32" cy="36" r="17"/><ellipse cx="32" cy="36" rx="17" ry="7"/><line x1="15" y1="36" x2="49" y2="36"/></g><circle cx="18" cy="50" r="2.6" fill="#ff5a4d"/><circle cx="44" cy="30" r="3" fill="#fffefb"/><circle cx="44" cy="30" r="6.5" fill="none" stroke="#ff5a4d" stroke-width="1.6" opacity=".75"/></svg>
+        <svg id="h-logo" viewBox="0 0 64 72" width="15" height="17" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(51,167,140,0.6))"><defs><linearGradient id="hl-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43d3ad"/><stop offset=".55" stop-color="#33a78c"/><stop offset="1" stop-color="#1f7763"/></linearGradient></defs><path d="M32 2 L60 13 V36 C60 54 47 66 32 70 C17 66 4 54 4 36 V13 Z" fill="url(#hl-sh)" stroke="#bcd9e9" stroke-opacity=".45" stroke-width="1.6"/><path d="M32 2 L32 70 C17 66 4 54 4 36 V13 Z" fill="#0d1117" fill-opacity=".12"/><path d="M32 24 l9 16 -9 9 -9 -9 Z" fill="#eef4f7"/><circle cx="47" cy="20" r="4.5" fill="#ff5a4d" stroke="#0d1117" stroke-width="1.2"/></svg>
         <span id="h-title">Self<span>ThreatMap</span></span>
-        <span id="map-version-badge">v2.1.0</span>
+        <span id="map-version-badge">v2.1.1</span>
       </div>
       <svg id="base-svg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
       <canvas id="arc-canvas"></canvas>
@@ -1167,7 +1171,7 @@ let SERVER_NAME_MAP = 'MEIN-SERVER';
 // Ab hier nichts mehr ändern
 // ============================================================
 
-const APP_VERSION  = 'v2.1.0';
+const APP_VERSION  = 'v2.1.1';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;
@@ -2302,12 +2306,14 @@ function openSettingsModal(){
   m.classList.remove('hidden');
   m.setAttribute('aria-hidden','false');
   document.getElementById('set-refresh-sec')?.focus();
+  if(typeof startRocketPreview==='function')startRocketPreview();
 }
 function closeSettingsModal(){
   const m=document.getElementById('settings-modal');
   if(!m)return;
   m.classList.add('hidden');
   m.setAttribute('aria-hidden','true');
+  if(typeof stopRocketPreview==='function')stopRocketPreview();
 }
 function saveSettingsFromForm(){
   mapSettings=readSettingsForm();

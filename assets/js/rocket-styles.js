@@ -271,3 +271,38 @@ function populateRocketStyleSelect(){
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',populateRocketStyleSelect);
 else populateRocketStyleSelect();
+
+/* ============================================================
+   Settings-Live-Vorschau: zeigt den gewählten Bahn-Stil animiert
+   ============================================================ */
+var _rsPrevRAF=null,_rsPrevT=0;
+var _rsPrevR={sx:42,sy:102,cpx:215,cpy:12,ex:404,ey:58};
+function _rsAccent(){try{var c=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();return c||'#33a78c';}catch(e){return '#33a78c';}}
+function _rsPrevDraw(){
+  var cv=document.getElementById('rstyle-preview');
+  if(!cv||cv.offsetParent===null){_rsPrevRAF=null;return;}
+  var ctx=cv.getContext('2d'),r=_rsPrevR;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var sel=document.getElementById('set-rocket-style');
+  var style=sel?sel.value:'rakete',col=_rsAccent();
+  rsSeg(ctx,r,0,1,26,col,1.2,0.14);                 // Flugbahn schwach
+  rsDot(ctx,r.sx,r.sy,3,col,0.9);                    // Quelle
+  var hp=(performance.now()/700)%1;                  // Ziel-Puls
+  rsRing(ctx,r.ex,r.ey,3+hp*10,col,1.4,1-hp);rsDot(ctx,r.ex,r.ey,3.5,col,1);
+  _rsPrevT+=0.012;if(_rsPrevT>1.1)_rsPrevT=0;
+  var t=Math.max(0,Math.min(1,_rsPrevT));ctx.globalAlpha=1;
+  try{
+    if(ROCKET_DRAWERS[style])ROCKET_DRAWERS[style](ctx,r,t,col,1,false);
+    else if(style==='arc'){ctx.setLineDash([5,4]);ctx.lineDashOffset=-(performance.now()/40)%18;rsSeg(ctx,r,0,1,26,col,1.8,0.85);ctx.setLineDash([]);}
+    else if(style==='legacy'){rsSeg(ctx,r,Math.max(0,t-0.05),t,2,col,2,0.9);rsHead(ctx,rsQp(r,t),col,1,false,2);}
+    else ROCKET_DRAWERS.komet(ctx,r,t,col,1,false);  // classic
+  }catch(e){}
+  ctx.globalAlpha=1;ctx.setLineDash([]);
+  _rsPrevRAF=requestAnimationFrame(_rsPrevDraw);
+}
+function startRocketPreview(){
+  var sel=document.getElementById('set-rocket-style');
+  if(sel&&!sel._rsBound){sel._rsBound=1;sel.addEventListener('change',function(){_rsPrevT=0;});}
+  if(_rsPrevRAF)return;_rsPrevT=0;_rsPrevRAF=requestAnimationFrame(_rsPrevDraw);
+}
+function stopRocketPreview(){if(_rsPrevRAF){cancelAnimationFrame(_rsPrevRAF);_rsPrevRAF=null;}}
