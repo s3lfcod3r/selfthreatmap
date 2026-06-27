@@ -2,6 +2,15 @@
 
 ---
 
+## v2.2.0 — 27.06.2026
+
+### 🌐 12 europäische Sprachen + In-App-Umschalter
+- Oberfläche jetzt in **12 Sprachen**: DE, EN, FR, ES, IT, PT, NL, PL, SV, DA, CS, EL
+- Neuer **Flaggen-Dropdown** im Dashboard zum Live-Umschalten; Wahl wird im Browser gemerkt (`localStorage`), Docker-`LANGUAGE` bleibt Standard
+- Übersetzungen in `assets/i18n/eu-languages.js` (alle Keys konsistent, im Browser getestet)
+
+---
+
 ## v2.1.3 — 27.06.2026
 
 ### 🐛 Fix: Einstellungs-Vorschau

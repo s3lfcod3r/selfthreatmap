@@ -9,6 +9,7 @@ function bootstrapApp(){
   loadRocketStylePrefs();
   syncMapToggleStates();
   applyLang();
+  if(typeof buildLangDropdown==='function'){buildLangDropdown();syncLangDropdown();}
 
   document.getElementById('set-override-coords')?.addEventListener('change',syncSettingsFormDisabled);
   document.getElementById('set-spawn-mode')?.addEventListener('change',updateSpawnModeHint);

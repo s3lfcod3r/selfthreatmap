@@ -242,6 +242,37 @@ function toggleThemeDropdown(e){if(e)e.stopPropagation();const p=document.getEle
 function closeThemeDropdown(){const p=document.getElementById('theme-dd-panel');if(p)p.classList.remove('open');}
 document.addEventListener('click',function(e){const dd=document.getElementById('theme-dd');if(dd&&!dd.contains(e.target))closeThemeDropdown();});
 
+/* ===== Sprach-Umschalter (In-App, 12 EU-Sprachen) ===== */
+const LANG_NAMES={de:['🇩🇪','Deutsch'],en:['🇬🇧','English'],fr:['🇫🇷','Français'],es:['🇪🇸','Español'],it:['🇮🇹','Italiano'],pt:['🇵🇹','Português'],nl:['🇳🇱','Nederlands'],pl:['🇵🇱','Polski'],sv:['🇸🇪','Svenska'],da:['🇩🇰','Dansk'],cs:['🇨🇿','Čeština'],el:['🇬🇷','Ελληνικά']};
+function buildLangDropdown(){
+  const panel=document.getElementById('lang-dd-panel');
+  if(!panel||typeof LANG==='undefined')return;
+  panel.innerHTML=Object.keys(LANG_NAMES).filter(c=>LANG[c]).map(c=>
+    `<div class="lang-item" onclick="setLanguage('${c}')"><span class="lang-flag">${LANG_NAMES[c][0]}</span><span>${LANG_NAMES[c][1]}</span></div>`
+  ).join('');
+}
+function syncLangDropdown(){
+  const cur=LANG_NAMES[currentLang]||['🌐',currentLang];
+  const f=document.getElementById('lang-dd-flag');if(f)f.textContent=cur[0];
+  document.querySelectorAll('.lang-item').forEach(el=>el.classList.toggle('active',el.getAttribute('onclick')===`setLanguage('${currentLang}')`));
+}
+function setLanguage(lang){
+  if(typeof LANG==='undefined'||!LANG[lang])return;
+  currentLang=lang;
+  try{localStorage.setItem('stmLang',lang);}catch(e){}
+  applyLang();
+  if(typeof renderFeed==='function')renderFeed();
+  if(typeof renderMapPanels==='function')renderMapPanels();
+  if(typeof renderSparkline==='function')renderSparkline();
+  if(typeof renderDots==='function')renderDots();
+  if(typeof drawCountryLabels==='function')drawCountryLabels();
+  syncLangDropdown();
+  closeLangDropdown();
+}
+function toggleLangDropdown(e){if(e)e.stopPropagation();const p=document.getElementById('lang-dd-panel');if(p)p.classList.toggle('open');}
+function closeLangDropdown(){const p=document.getElementById('lang-dd-panel');if(p)p.classList.remove('open');}
+document.addEventListener('click',function(e){const dd=document.getElementById('lang-dd');if(dd&&!dd.contains(e.target))closeLangDropdown();});
+
 function checkAlarms(){} // Stub — kein Sound mehr
 
 function exportCSV(){
