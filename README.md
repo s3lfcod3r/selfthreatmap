@@ -7,7 +7,7 @@
 **Live attack map straight from your local CrowdSec database**
 **Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank**
 
-[![Version](https://img.shields.io/badge/version-v2.4.0-33a78c?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.4.1-33a78c?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Docker%20%7C%20Unraid-1db8d4?style=flat-square)](#-installation)
 [![Python](https://img.shields.io/badge/python-3.12-9dbdd0?style=flat-square&logo=python&logoColor=white)](crowdsec_exporter.py)

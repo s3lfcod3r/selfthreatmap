@@ -24,7 +24,7 @@ const SETTINGS_HELP={
     'set-server-lon':'Server-Längengrad (LON).',
     'set-server-name':'Name des Home-Punkts auf der Karte.',
     'set-city-zoom-min':'Ab welcher Zoomstufe Stadtnamen erscheinen (Standard 2).',
-    'set-city-zoom-max':'Bis zu welcher Zoomstufe Stadtnamen sichtbar bleiben (Standard 5). Auf 8 setzen = auch beim ganz nah Reinzoomen sichtbar.',
+    'set-city-zoom-max':'Bis zu welcher Zoomstufe Stadtnamen sichtbar bleiben (Standard 5, max. 25). Auf 25 setzen = auch beim ganz nah Reinzoomen sichtbar.',
   },
   en:{
     default:'Select a value to see what this setting does.',
@@ -51,7 +51,7 @@ const SETTINGS_HELP={
     'set-server-lon':'Server longitude (LON).',
     'set-server-name':'Home marker label.',
     'set-city-zoom-min':'Zoom level at which city names start to appear (default 2).',
-    'set-city-zoom-max':'Zoom level up to which city names stay visible (default 5). Set to 8 to keep them when zoomed all the way in.',
+    'set-city-zoom-max':'Zoom level up to which city names stay visible (default 5, max 25). Set to 25 to keep them when zoomed all the way in.',
   }
 };
 

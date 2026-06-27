@@ -2,6 +2,13 @@
 
 ---
 
+## v2.4.1 — 27.06.2026
+
+### 🏙️ Stadtnamen-Zoom bis 25
+- „Stadtnamen ab/bis Zoom" geht jetzt bis **25** (vorher 8) — passt zum tatsächlichen Karten-Maximalzoom (25×). Auf 25 gesetzt bleiben die Namen auch beim ganz nah Reinzoomen sichtbar.
+
+---
+
 ## v2.4.0 — 27.06.2026
 
 ### 📦 Offline-fähig (kein CDN mehr)

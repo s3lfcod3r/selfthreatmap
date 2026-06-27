@@ -842,9 +842,9 @@
         <label class="settings-field"><span id="set-lbl-lat">Breitengrad (LAT)</span><input type="text" id="set-server-lat" inputmode="decimal" placeholder="53.55"></label>
         <label class="settings-field"><span id="set-lbl-lon">Längengrad (LON)</span><input type="text" id="set-server-lon" inputmode="decimal" placeholder="10.00"></label>
         <label class="settings-field"><span id="set-lbl-name">Anzeigename</span><input type="text" id="set-server-name" maxlength="32" placeholder="Home"></label>
-        <label class="settings-field"><span id="set-lbl-cityzoom-min">Stadtnamen ab Zoom</span><input type="number" id="set-city-zoom-min" min="1" max="8" step="0.5"></label>
-        <label class="settings-field"><span id="set-lbl-cityzoom-max">Stadtnamen bis Zoom</span><input type="number" id="set-city-zoom-max" min="1" max="8" step="0.5"></label>
-        <p class="settings-hint" id="settings-cityzoom-hint">Bei welchem Zoom Stadtnamen sichtbar sind. Tipp: „bis Zoom" auf 8 setzen, damit sie auch beim ganz nah Reinzoomen bleiben.</p>
+        <label class="settings-field"><span id="set-lbl-cityzoom-min">Stadtnamen ab Zoom</span><input type="number" id="set-city-zoom-min" min="1" max="25" step="0.5"></label>
+        <label class="settings-field"><span id="set-lbl-cityzoom-max">Stadtnamen bis Zoom</span><input type="number" id="set-city-zoom-max" min="1" max="25" step="0.5"></label>
+        <p class="settings-hint" id="settings-cityzoom-hint">Bei welchem Zoom Stadtnamen sichtbar sind. Tipp: „bis Zoom" auf 25 setzen, damit sie auch beim ganz nah Reinzoomen bleiben.</p>
         <p class="settings-hint" id="settings-coords-hint">Docker-Werte werden beim Start von /config geladen.</p>
       </section>
     </div>
@@ -877,7 +877,7 @@
       <div id="map-title-overlay">
         <img id="h-logo" src="assets/logo/shield.png" alt="" width="16" height="20" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(51,167,140,0.55))">
         <span id="h-title">Self<span>ThreatMap</span></span>
-        <span id="map-version-badge">v2.4.0</span>
+        <span id="map-version-badge">v2.4.1</span>
       </div>
       <svg id="base-svg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
       <canvas id="arc-canvas"></canvas>
@@ -1207,7 +1207,7 @@ let SERVER_NAME_MAP = 'MEIN-SERVER';
 // Ab hier nichts mehr ändern
 // ============================================================
 
-const APP_VERSION  = 'v2.4.0';
+const APP_VERSION  = 'v2.4.1';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;
@@ -2339,8 +2339,8 @@ function readSettingsForm(){
     serverLat:String(set('set-server-lat')?.value||'').trim(),
     serverLon:String(set('set-server-lon')?.value||'').trim(),
     serverName:String(set('set-server-name')?.value||'').trim(),
-    cityZoomMin:clampNum(set('set-city-zoom-min')?.value,1,8,2),
-    cityZoomMax:clampNum(set('set-city-zoom-max')?.value,1,8,5),
+    cityZoomMin:clampNum(set('set-city-zoom-min')?.value,1,25,2),
+    cityZoomMax:clampNum(set('set-city-zoom-max')?.value,1,25,5),
   };
 }
 function openSettingsModal(){
