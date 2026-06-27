@@ -504,6 +504,15 @@
   .theme-btn span{font-size:clamp(6px,0.85vw,7px);letter-spacing:0px;color:rgba(160,255,216,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .theme-btn.active span{color:var(--accent);}
   .theme-swatch{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  /* THEME DROPDOWN (platzsparend) */
+  #theme-dd{position:relative;flex:1;min-width:0;}
+  #theme-dd-btn{display:flex;align-items:center;gap:5px;width:100%;padding:3px 7px;border:1px solid rgba(0,229,200,0.22);border-radius:4px;background:rgba(0,10,25,0.6);color:var(--text);cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:clamp(6px,0.9vw,8px);letter-spacing:0.5px;transition:all 0.15s;}
+  #theme-dd-btn:hover{border-color:var(--accent);}
+  #theme-dd-name{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--accent);}
+  .theme-dd-caret{font-size:8px;opacity:0.6;flex-shrink:0;}
+  #theme-dd-panel{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:200;display:none;flex-direction:column;gap:2px;padding:4px;background:rgba(2,10,18,0.98);border:1px solid var(--dim);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:230px;overflow-y:auto;}
+  #theme-dd-panel.open{display:flex;}
+  #theme-dd-panel .theme-btn{flex:none;width:100%;justify-content:flex-start;padding:4px 7px;}
 
   /* EXPORT + SOUND buttons in sidebar-controls */
   .ctrl-btn{background:rgba(0,20,40,0.85);border:1px solid var(--dim);border-radius:3px;padding:2px 4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:clamp(6px,0.9vw,8px);color:var(--text);letter-spacing:0px;transition:all 0.2s;white-space:nowrap;opacity:0.7;}
@@ -823,6 +832,9 @@
         <label class="settings-field"><span id="set-lbl-lat">Breitengrad (LAT)</span><input type="text" id="set-server-lat" inputmode="decimal" placeholder="53.55"></label>
         <label class="settings-field"><span id="set-lbl-lon">Längengrad (LON)</span><input type="text" id="set-server-lon" inputmode="decimal" placeholder="10.00"></label>
         <label class="settings-field"><span id="set-lbl-name">Anzeigename</span><input type="text" id="set-server-name" maxlength="32" placeholder="Home"></label>
+        <label class="settings-field"><span id="set-lbl-cityzoom-min">Stadtnamen ab Zoom</span><input type="number" id="set-city-zoom-min" min="1" max="8" step="0.5"></label>
+        <label class="settings-field"><span id="set-lbl-cityzoom-max">Stadtnamen bis Zoom</span><input type="number" id="set-city-zoom-max" min="1" max="8" step="0.5"></label>
+        <p class="settings-hint" id="settings-cityzoom-hint">Bei welchem Zoom Stadtnamen sichtbar sind. Tipp: „bis Zoom" auf 8 setzen, damit sie auch beim ganz nah Reinzoomen bleiben.</p>
         <p class="settings-hint" id="settings-coords-hint">Docker-Werte werden beim Start von /config geladen.</p>
       </section>
     </div>
@@ -855,7 +867,7 @@
       <div id="map-title-overlay">
         <svg id="h-logo" viewBox="0 0 64 72" width="15" height="17" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(51,167,140,0.6))"><defs><linearGradient id="hl-sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43d3ad"/><stop offset=".55" stop-color="#33a78c"/><stop offset="1" stop-color="#1f7763"/></linearGradient></defs><path d="M32 2 L60 13 V36 C60 54 47 66 32 70 C17 66 4 54 4 36 V13 Z" fill="url(#hl-sh)" stroke="#bcd9e9" stroke-opacity=".45" stroke-width="1.6"/><path d="M32 2 L32 70 C17 66 4 54 4 36 V13 Z" fill="#0d1117" fill-opacity=".12"/><path d="M32 24 l9 16 -9 9 -9 -9 Z" fill="#eef4f7"/><circle cx="47" cy="20" r="4.5" fill="#ff5a4d" stroke="#0d1117" stroke-width="1.2"/></svg>
         <span id="h-title">Self<span>ThreatMap</span></span>
-        <span id="map-version-badge">v2.1.1</span>
+        <span id="map-version-badge">v2.1.2</span>
       </div>
       <svg id="base-svg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
       <canvas id="arc-canvas"></canvas>
@@ -1000,16 +1012,25 @@
       <!-- Theme row: separate line below controls -->
       <div id="theme-row">
         <span id="theme-lbl">THEME:</span>
-        <div class="theme-btn active" id="theme-cyan" onclick="setTheme('cyan')"><div class="theme-swatch" style="background:#00e5c8;"></div><span>CYAN</span></div>
-        <div class="theme-btn" id="theme-red" onclick="setTheme('red')"><div class="theme-swatch" style="background:#f85149;"></div><span>ALARM</span></div>
-        <div class="theme-btn" id="theme-matrix" onclick="setTheme('matrix')"><div class="theme-swatch" style="background:#3fb950;"></div><span>MATRIX</span></div>
-        <div class="theme-btn" id="theme-amber" onclick="setTheme('amber')"><div class="theme-swatch" style="background:#ffaa00;"></div><span>AMBER</span></div>
-        <div class="theme-btn" id="theme-arctic" onclick="setTheme('arctic')"><div class="theme-swatch" style="background:#7fd4ff;"></div><span>ARCTIC</span></div>
-        <div class="theme-btn" id="theme-cyber" onclick="setTheme('cyber')"><div class="theme-swatch" style="background:#b46aff;"></div><span>CYBER</span></div>
-        <div class="theme-btn" id="theme-inferno" onclick="setTheme('inferno')"><div class="theme-swatch" style="background:#ff7a2d;"></div><span>INFERNO</span></div>
-        <div class="theme-btn" id="theme-mono" onclick="setTheme('mono')"><div class="theme-swatch" style="background:#e6edf2;"></div><span>MONO</span></div>
-        <div class="theme-btn" id="theme-synth" onclick="setTheme('synth')"><div class="theme-swatch" style="background:#ff5ad0;"></div><span>SYNTH</span></div>
-        <div class="theme-btn" id="theme-ocean" onclick="setTheme('ocean')"><div class="theme-swatch" style="background:#22d3d3;"></div><span>OCEAN</span></div>
+        <div id="theme-dd">
+          <button type="button" id="theme-dd-btn" onclick="toggleThemeDropdown(event)" title="Theme wählen">
+            <span class="theme-swatch" id="theme-dd-sw" style="background:#00e5c8;"></span>
+            <span id="theme-dd-name">CYAN</span>
+            <span class="theme-dd-caret">▾</span>
+          </button>
+          <div id="theme-dd-panel">
+            <div class="theme-btn active" id="theme-cyan" onclick="setTheme('cyan')"><div class="theme-swatch" style="background:#00e5c8;"></div><span>CYAN</span></div>
+            <div class="theme-btn" id="theme-red" onclick="setTheme('red')"><div class="theme-swatch" style="background:#f85149;"></div><span>ALARM</span></div>
+            <div class="theme-btn" id="theme-matrix" onclick="setTheme('matrix')"><div class="theme-swatch" style="background:#3fb950;"></div><span>MATRIX</span></div>
+            <div class="theme-btn" id="theme-amber" onclick="setTheme('amber')"><div class="theme-swatch" style="background:#ffaa00;"></div><span>AMBER</span></div>
+            <div class="theme-btn" id="theme-arctic" onclick="setTheme('arctic')"><div class="theme-swatch" style="background:#7fd4ff;"></div><span>ARCTIC</span></div>
+            <div class="theme-btn" id="theme-cyber" onclick="setTheme('cyber')"><div class="theme-swatch" style="background:#b46aff;"></div><span>CYBER</span></div>
+            <div class="theme-btn" id="theme-inferno" onclick="setTheme('inferno')"><div class="theme-swatch" style="background:#ff7a2d;"></div><span>INFERNO</span></div>
+            <div class="theme-btn" id="theme-mono" onclick="setTheme('mono')"><div class="theme-swatch" style="background:#e6edf2;"></div><span>MONO</span></div>
+            <div class="theme-btn" id="theme-synth" onclick="setTheme('synth')"><div class="theme-swatch" style="background:#ff5ad0;"></div><span>SYNTH</span></div>
+            <div class="theme-btn" id="theme-ocean" onclick="setTheme('ocean')"><div class="theme-swatch" style="background:#22d3d3;"></div><span>OCEAN</span></div>
+          </div>
+        </div>
         <button type="button" id="settings-open-btn" class="settings-open-btn" onclick="openSettingsModal()" title="Einstellungen">⚙ <span id="settings-open-lbl">EINST.</span></button>
       </div>
     </div>
@@ -1171,7 +1192,7 @@ let SERVER_NAME_MAP = 'MEIN-SERVER';
 // Ab hier nichts mehr ändern
 // ============================================================
 
-const APP_VERSION  = 'v2.1.1';
+const APP_VERSION  = 'v2.1.2';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;
@@ -1196,6 +1217,7 @@ const MAP_SETTINGS_DEFAULTS={
   rocketTailClassic:0.13,rocketTailLegacy:0.06,rocketTailArc:0.10,rocketLaneSpread:12,
   showFlightLabels:true,maxFlightLabels:8,replayDurationMin:3,
   maxConsoleArcs:150,
+  cityZoomMin:2,cityZoomMax:5,
   rocketStyle:'rakete',
   overrideCoords:false,serverLat:'',serverLon:'',serverName:'',
 };
@@ -1313,8 +1335,9 @@ function countryLabelScreenPx(){
   return 10;
 }
 function cityLabelScreenPx(){
-  if(currentScale<2)return 0;
-  if(currentScale>=5)return 0;
+  const mn=mapSettings.cityZoomMin??2, mx=mapSettings.cityZoomMax??5;
+  if(currentScale<mn)return 0;
+  if(currentScale>=mx)return 0;
   return Math.min(12,Math.max(8,6+currentScale*0.55));
 }
 function clearArcCanvas(){ctx2d.clearRect(0,0,canvas.width,canvas.height);}
@@ -2267,6 +2290,8 @@ function fillSettingsForm(){
   set('set-server-lat',s.serverLat!==''?s.serverLat:SERVER_LAT);
   set('set-server-lon',s.serverLon!==''?s.serverLon:SERVER_LON);
   set('set-server-name',s.serverName||SERVER_NAME_MAP);
+  set('set-city-zoom-min',s.cityZoomMin??2);
+  set('set-city-zoom-max',s.cityZoomMax??5);
   syncSettingsFormDisabled();
   updateSettingsCoordsHint();
   updateSpawnModeHint();
@@ -2297,6 +2322,8 @@ function readSettingsForm(){
     serverLat:String(set('set-server-lat')?.value||'').trim(),
     serverLon:String(set('set-server-lon')?.value||'').trim(),
     serverName:String(set('set-server-name')?.value||'').trim(),
+    cityZoomMin:clampNum(set('set-city-zoom-min')?.value,1,8,2),
+    cityZoomMax:clampNum(set('set-city-zoom-max')?.value,1,8,5),
   };
 }
 function openSettingsModal(){
@@ -2328,6 +2355,7 @@ function saveSettingsFromForm(){
     drawServerDots();
     renderDots();
     drawCountryLabels();
+    updateCityLabelScale();
     if(!userHasZoomed)scheduleHomeFit();
   }
   if(animOn&&linesOn)drawCrowdSecRockets(performance.now());

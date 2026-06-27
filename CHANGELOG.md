@@ -2,6 +2,17 @@
 
 ---
 
+## v2.1.2 — 27.06.2026
+
+### 🎚️ Theme-Dropdown
+- Die 10 Farbthemen sitzen jetzt in einem platzsparenden **Aufklapp-Menü** (statt 3 Button-Reihen)
+
+### 🏙️ Stadtnamen-Zoom konfigurierbar
+- Neue Einstellungen **„Stadtnamen ab/bis Zoom"** (Karte/Server) — selbst festlegen, in welchem Zoombereich Städtenamen sichtbar sind
+- Tipp: „bis Zoom" auf 8 → Namen bleiben auch beim ganz nah Reinzoomen sichtbar (vorher fix bei 5 ausgeblendet)
+
+---
+
 ## v2.1.1 — 27.06.2026
 
 ### 🎨 Branding-Feinschliff

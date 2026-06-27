@@ -233,7 +233,14 @@ function setTheme(name){
   if(dotG){renderDots();drawServerDots();drawCountryLabels();}
   if(animOn&&linesOn)drawCrowdSecRockets();else clearArcCanvas();
   renderSparkline();
+  // Dropdown-Trigger aktualisieren
+  const _ddSw=document.getElementById('theme-dd-sw'),_ddNm=document.getElementById('theme-dd-name'),_curBtn=document.getElementById('theme-'+name);
+  if(_curBtn){const s=_curBtn.querySelector('.theme-swatch');const lab=_curBtn.querySelector('span:last-child');if(_ddSw&&s)_ddSw.style.background=s.style.background;if(_ddNm&&lab)_ddNm.textContent=lab.textContent;}
+  closeThemeDropdown();
 }
+function toggleThemeDropdown(e){if(e)e.stopPropagation();const p=document.getElementById('theme-dd-panel');if(p)p.classList.toggle('open');}
+function closeThemeDropdown(){const p=document.getElementById('theme-dd-panel');if(p)p.classList.remove('open');}
+document.addEventListener('click',function(e){const dd=document.getElementById('theme-dd');if(dd&&!dd.contains(e.target))closeThemeDropdown();});
 
 function checkAlarms(){} // Stub — kein Sound mehr
 

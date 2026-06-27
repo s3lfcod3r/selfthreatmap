@@ -23,6 +23,8 @@ const SETTINGS_HELP={
     'set-server-lat':'Server-Breitengrad (LAT).',
     'set-server-lon':'Server-Längengrad (LON).',
     'set-server-name':'Name des Home-Punkts auf der Karte.',
+    'set-city-zoom-min':'Ab welcher Zoomstufe Stadtnamen erscheinen (Standard 2).',
+    'set-city-zoom-max':'Bis zu welcher Zoomstufe Stadtnamen sichtbar bleiben (Standard 5). Auf 8 setzen = auch beim ganz nah Reinzoomen sichtbar.',
   },
   en:{
     default:'Select a value to see what this setting does.',
@@ -48,6 +50,8 @@ const SETTINGS_HELP={
     'set-server-lat':'Server latitude (LAT).',
     'set-server-lon':'Server longitude (LON).',
     'set-server-name':'Home marker label.',
+    'set-city-zoom-min':'Zoom level at which city names start to appear (default 2).',
+    'set-city-zoom-max':'Zoom level up to which city names stay visible (default 5). Set to 8 to keep them when zoomed all the way in.',
   }
 };
 
@@ -59,7 +63,7 @@ function updateSettingsHelpForField(id){
 }
 
 function initSettingsHelpBindings(){
-  const ids=['set-refresh-sec','set-max-active','set-max-pending','set-max-batch','set-performance-preset','set-duration-sec','set-stagger-ms','set-ui-throttle','set-label-throttle','set-replay-min','set-spawn-mode','set-queue-ip','set-rocket-style','set-tail-classic','set-lane-spread','set-max-arcs','set-show-labels','set-max-labels','set-override-coords','set-server-lat','set-server-lon','set-server-name'];
+  const ids=['set-refresh-sec','set-max-active','set-max-pending','set-max-batch','set-performance-preset','set-duration-sec','set-stagger-ms','set-ui-throttle','set-label-throttle','set-replay-min','set-spawn-mode','set-queue-ip','set-rocket-style','set-tail-classic','set-lane-spread','set-max-arcs','set-show-labels','set-max-labels','set-override-coords','set-server-lat','set-server-lon','set-server-name','set-city-zoom-min','set-city-zoom-max'];
   ids.forEach(id=>{
     const el=document.getElementById(id);
     if(!el)return;
