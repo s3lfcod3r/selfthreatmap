@@ -2,6 +2,14 @@
 
 ---
 
+## v2.3.2 — 27.06.2026
+
+### 🐛 Fix: Sprach- & Theme-Dropdown ließen sich nicht öffnen
+- `#theme-row` hatte `overflow:hidden` → die aufklappenden Panels (Sprache **und** Theme) wurden direkt unter der Zeile abgeschnitten, Klicks landeten auf den Tabs darunter — man konnte keine andere Sprache wählen
+- Auf `overflow:visible` geändert; an der laufenden Instanz reproduziert und der Fix per echtem Klick verifiziert (DE → FR live)
+
+---
+
 ## v2.3.1 — 27.06.2026
 
 ### 🛡️ Echtes Self-Schild

@@ -488,7 +488,7 @@
   #theme-row{
     display:flex;align-items:center;gap:3px;
     padding:4px 8px;border-bottom:1px solid var(--dim);
-    background:rgba(0,5,15,0.8);flex-shrink:0;flex-wrap:wrap;overflow:hidden;
+    background:rgba(0,5,15,0.8);flex-shrink:0;flex-wrap:wrap;overflow:visible;
   }
   #theme-lbl{font-size:7px;color:rgba(160,255,216,0.3);letter-spacing:1px;margin-right:2px;white-space:nowrap;flex-shrink:1;overflow:hidden;transition:opacity 0.2s;}
   /* "THEME:" Label verschwindet bei schmalem Fenster — via JS ResizeObserver */
@@ -1206,7 +1206,7 @@ let SERVER_NAME_MAP = 'MEIN-SERVER';
 // Ab hier nichts mehr ändern
 // ============================================================
 
-const APP_VERSION  = 'v2.3.1';
+const APP_VERSION  = 'v2.3.2';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;
