@@ -2,6 +2,14 @@
 
 ---
 
+## v2.1.3 — 27.06.2026
+
+### 🐛 Fix: Einstellungs-Vorschau
+- Die Live-Vorschau des Bahn-Stils fror nach dem ersten Bild ein (zeigte immer dieselbe Rakete) — die Animations-Schleife wurde fälschlich gestoppt
+- Schleife läuft jetzt durch und liest den gewählten Stil live; im Browser getestet (legacy/morse/rakete zeichnen korrekt unterschiedlich)
+
+---
+
 ## v2.1.2 — 27.06.2026
 
 ### 🎚️ Theme-Dropdown
