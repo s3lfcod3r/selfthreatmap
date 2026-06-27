@@ -237,4 +237,38 @@
     Required="false"
     Mask="false">300</Config>
 
+  <!-- ═══════ LIVE FIREWALL DROPS (optional) ═══════ -->
+  <Config
+    Name="Live-Drops aktivieren"
+    Target="DROPS_ENABLED"
+    Default="false"
+    Mode=""
+    Description="Optionale /drops-API: zeigt aktiv von der Firewall verworfene Pakete. Benötigt eine gemountete drops.jsonl (siehe Drops-Verzeichnis). Standard: aus."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">false</Config>
+
+  <Config
+    Name="Drops JSONL-Pfad"
+    Target="DROPS_LOG_PATH"
+    Default="/crowdsec/drops/drops.jsonl"
+    Mode=""
+    Description="Pfad zur JSONL-Datei innerhalb des Containers (eine Zeile = ein verworfenes Paket). Nur relevant wenn DROPS_ENABLED=true."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">/crowdsec/drops/drops.jsonl</Config>
+
+  <Config
+    Name="Drops-Verzeichnis (optional)"
+    Target="/crowdsec/drops"
+    Default=""
+    Mode="ro"
+    Description="Optionales Verzeichnis mit drops.jsonl für das Live-Firewall-Drops-Panel. Leer lassen, wenn nur die Bedrohungskarte gewünscht ist."
+    Type="Path"
+    Display="advanced"
+    Required="false"
+    Mask="false"></Config>
+
 </Container>

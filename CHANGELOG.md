@@ -2,6 +2,15 @@
 
 ---
 
+## v2.3.0 — 27.06.2026
+
+### 🔥 Live Firewall Drops — `/drops` API (aus Railline-Fork portiert)
+- Optionale **`/drops`-JSON-API** im Exporter (`DROPS_ENABLED=true`), liest eine gemountete `drops.jsonl` (eine Zeile = ein von der Firewall verworfenes Paket), mit Geo-Anreicherung (MMDB/Geo-Lookup), Alters-/Mengen-Limits
+- nginx-Route `/drops`, docker-compose- & Unraid-Template-Optionen (Verzeichnis + Variablen), standardmäßig **aus**
+- Backend kompiliert (`py_compile`); visuelles Drops-Panel folgt separat
+
+---
+
 ## v2.2.0 — 27.06.2026
 
 ### 🌐 12 europäische Sprachen + In-App-Umschalter
