@@ -2,6 +2,16 @@
 
 ---
 
+## v2.6.0 — 28.06.2026
+
+### 🗺️ Angriffs-Herkünfte-Übersicht
+- Klick auf das **„LÄNDER"-Stat** im Kopf öffnet eine Gesamt-Übersicht: **jedes Land**, aus dem du je angegriffen wurdest, als sortierte Rangliste (Flagge, Anzahl, Balken) — plus **Top-Städte**. Basiert auf allen geladenen Angriffen. Code: `assets/js/origins.js`. Im Browser verifiziert.
+
+### 💄 Obere Steuerzeile aufgeräumt
+- Das Profil-Dropdown bekommt eine **eigene Zeile** (volle Breite), darunter THEMA + Sprache + Einstellungen — vorher gedrängt/umgebrochen.
+
+---
+
 ## v2.5.1 — 28.06.2026
 
 ### 🐛 Fix: Profil-Dropdown ließ sich nicht ausklappen

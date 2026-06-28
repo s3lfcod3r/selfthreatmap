@@ -7,7 +7,7 @@
 **Live attack map straight from your local CrowdSec database**
 **Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank**
 
-[![Version](https://img.shields.io/badge/version-v2.5.1-33a78c?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.6.0-33a78c?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Docker%20%7C%20Unraid-1db8d4?style=flat-square)](#-installation)
 [![Python](https://img.shields.io/badge/python-3.12-9dbdd0?style=flat-square&logo=python&logoColor=white)](crowdsec_exporter.py)
@@ -28,6 +28,7 @@
 - 🌍 **Interactive world map** with animated attack paths (D3.js) — all attack points visible on load
 - 🚀 **30+ flight-path styles** — rocket (default), comet, laser, particle stream, arcs, impact rings & more, switchable in settings
 - 🎛️ **50+ one-click profiles** — top dropdown presets that bundle style + theme + animation + density + mode (e.g. "All attacks (console)", "Static heatmap", "Comet rain", "Matrix mode", "Brute-force hunt")
+- 🗺️ **Attack-origins overview** — click "Countries" to see every country (and top cities) you've ever been attacked from, ranked with counts & bars
 - 🎯 **Auto-fit zoom** + city names visible all the way in (up to 25×)
 - 🔍 **Real-time search** by IP, country, city, scenario, ASN
 - 🚫 **Ban status & one-click IP unban** straight from the dashboard
@@ -108,6 +109,7 @@ The dashboard can lift CrowdSec bans via the Docker socket — treat port **8080
 - 🌍 **Interaktive Weltkarte** mit animierten Angriffsbahnen (D3.js)
 - 🚀 **Über 30 Bahn-Stile** — Rakete (Standard), Komet, Laser, Partikel-Strom, Bögen, Einschlag-Ringe u. v. m., umschaltbar in den Einstellungen
 - 🎛️ **50+ Ein-Klick-Profile** — Dropdown oben mit Voreinstellungen, die Stil + Theme + Animation + Dichte + Modus bündeln (z. B. „Alle Angriffe (Console)", „Heatmap pur", „Kometen-Regen", „Matrix-Modus", „Brute-Force-Jagd")
+- 🗺️ **Herkünfte-Übersicht** — Klick auf „LÄNDER" zeigt jedes Land (und die Top-Städte), aus dem du je angegriffen wurdest, sortiert mit Anzahl & Balken
 - 🎯 **Auto-Fit-Zoom** + Stadtnamen bis ganz nah sichtbar (bis 25×)
 - 🔍 **Echtzeit-Suche** nach IP, Land, Stadt, Szenario, ASN
 - 🚫 **Ban-Status & IP-Unban** direkt aus dem Dashboard
