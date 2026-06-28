@@ -71,44 +71,79 @@ function toggleOriginsOverlay(){
   renderOriginsOverlay();
 }
 
+let _originsRaf = null;
+// Throttled (1×/Frame) — für flüssiges Zoomen
+function requestOriginsRender(){
+  if(!originsOverlayOn) return;
+  if(_originsRaf) return;
+  _originsRaf = requestAnimationFrame(function(){ _originsRaf = null; renderOriginsOverlay(); });
+}
+
 function renderOriginsOverlay(){
   if(typeof dotG==='undefined' || !dotG) return;
   dotG.selectAll('.origin-dot,.origin-label').remove();
   if(!originsOverlayOn) return;
   const events = (typeof allEvents!=='undefined' && allEvents.length) ? allEvents
                : (typeof feedData!=='undefined' ? feedData : []);
-  const byC = {};
+  // Pro Ort (Stadt-Ebene) aggregieren
+  const byLoc = {};
   events.forEach(e=>{
     if(e.lat==null || e.lon==null) return;
-    const cc = String(e.country||'??').toUpperCase().slice(0,2);
-    let c = byC[cc]; if(!c){ c = byC[cc] = {cc, n:0, locN:{}, best:null, bestN:-1}; }
-    c.n++;
-    const lk = e.lat.toFixed(2)+','+e.lon.toFixed(2);
-    const v = (c.locN[lk] = (c.locN[lk]||0) + 1);
-    if(v > c.bestN){ c.bestN = v; c.best = [e.lon, e.lat]; }
+    const key = e.lat.toFixed(2)+','+e.lon.toFixed(2);
+    let L = byLoc[key];
+    if(!L){ L = byLoc[key] = {lon:e.lon, lat:e.lat, country:String(e.country||'??').toUpperCase().slice(0,2), city:e.city||'', n:0}; }
+    L.n++;
+    if(e.city && !L.city) L.city = e.city;
   });
-  const list = Object.values(byC).filter(c=>c.best);
-  if(!list.length) return;
-  const maxN = Math.max.apply(null, list.map(c=>c.n).concat([1]));
-  const ik = 1 / Math.max((typeof currentScale!=='undefined' ? currentScale : 1), 0.15);
-  const font = (typeof labelPxToSvg==='function') ? labelPxToSvg(11) : (11*ik)+'px';
+  const locs = Object.values(byLoc);
+  if(!locs.length) return;
+  const k  = Math.max((typeof currentScale!=='undefined' ? currentScale : 1), 0.15);
+  const ik = 1/k;
+  const tx = (typeof currentTx!=='undefined') ? currentTx : 0;
+  const ty = (typeof currentTy!=='undefined') ? currentTy : 0;
   const cname = cc => (typeof COUNTRY_NAME!=='undefined' && COUNTRY_NAME[cc]) || cc;
-  list.sort((a,b)=>a.n-b.n);   // kleine zuerst zeichnen, große oben drauf
-  list.forEach(c=>{
-    const p = proj(c.best); if(!p) return;
-    const r = 3 + Math.round((c.n/maxN) * 6);
+  const maxN = Math.max.apply(null, locs.map(l=>l.n).concat([1]));
+
+  // 1) PUNKTE: jeder getroffene Ort, kleine konstante Bildschirmgröße
+  locs.forEach(l=>{
+    const p = proj([l.lon, l.lat]); if(!p) return;
+    const r = 2 + Math.round((l.n/maxN) * 3);   // 2..5 px
     dotG.append('circle').attr('class','origin-dot')
       .attr('cx',p[0]).attr('cy',p[1]).attr('r',r*ik).attr('data-sr',r)
-      .attr('fill','var(--accent)').attr('fill-opacity',0.9)
-      .attr('stroke','#fff').attr('stroke-opacity',0.55).attr('stroke-width',ik)
-      .append('title').text(cname(c.cc)+': '+c.n);
+      .attr('fill','var(--accent)').attr('fill-opacity',0.85)
+      .attr('stroke','#fff').attr('stroke-opacity',0.35).attr('stroke-width',0.8*ik)
+      .append('title').text(cname(l.country)+(l.city?' · '+l.city:'')+': '+l.n);
+  });
+
+  // 2) LABELS mit Überlappungsschutz; Land bei kleinem Zoom, Stadt ab CITY_ZOOM
+  const CITY_ZOOM = 4;
+  let cand;
+  if(k < CITY_ZOOM){
+    const byC = {};
+    locs.forEach(l=>{ let c=byC[l.country]; if(!c){c=byC[l.country]={cc:l.country,n:0,best:l,bestN:-1};} c.n+=l.n; if(l.n>c.bestN){c.bestN=l.n;c.best=l;} });
+    cand = Object.values(byC).map(c=>({lon:c.best.lon, lat:c.best.lat, text:cname(c.cc)+' ('+c.n+')', n:c.n}));
+  } else {
+    cand = locs.map(l=>({lon:l.lon, lat:l.lat, text:(l.city ? (typeof translateCity==='function'?translateCity(l.city):l.city) : cname(l.country))+' ('+l.n+')', n:l.n}));
+  }
+  cand.sort((a,b)=>b.n-a.n);                    // wichtigste zuerst platzieren
+  if(cand.length > 220) cand = cand.slice(0,220);
+  const placed = [];
+  const fontPx = 11, charW = fontPx*0.62, pad = 4, h = fontPx + 4;
+  const font = (typeof labelPxToSvg==='function') ? labelPxToSvg(fontPx) : (fontPx*ik)+'px';
+  cand.forEach(c=>{
+    const p = proj([c.lon, c.lat]); if(!p) return;
+    const sx = tx + p[0]*k, sy = ty + p[1]*k;   // Bildschirmposition des Punkts
+    const w = c.text.length*charW + 6;
+    const lx = sx + 6, lyTop = sy - h/2;
+    for(const r of placed){ if(lx < r.x+r.w+pad && lx+w+pad > r.x && lyTop < r.y+r.h+pad && lyTop+h+pad > r.y) return; }
+    placed.push({x:lx, y:lyTop, w, h});
     dotG.append('text').attr('class','origin-label')
-      .attr('x',p[0]+(r+2)*ik).attr('y',p[1]+3*ik)
+      .attr('x',p[0]+6*ik).attr('y',p[1]+3*ik)
       .attr('font-size',font)
       .attr('fill','var(--text)').attr('font-family','Share Tech Mono,monospace')
       .attr('pointer-events','none').attr('paint-order','stroke')
-      .attr('stroke','rgba(0,6,12,0.78)').attr('stroke-width',0.5*ik)
-      .text(cname(c.cc)+' ('+c.n+')');
+      .attr('stroke','rgba(0,6,12,0.85)').attr('stroke-width',0.6*ik)
+      .text(c.text);
   });
 }
 

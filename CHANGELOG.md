@@ -2,6 +2,15 @@
 
 ---
 
+## v2.7.1 — 28.06.2026
+
+### 🗺️ HERKÜNFTE-Overlay: übersichtlich & ohne Überlappung
+- **Kollisionsschutz** für die Labels: bei kleinem Zoom (z. B. 1,1×) überlagern sie sich nicht mehr — nur die wichtigsten Länder (nach Anzahl) werden beschriftet, der Rest bleibt als Punkt sichtbar.
+- **Level-of-Detail beim Reinzoomen**: ab Zoom 4× erscheinen die **Stadtnamen** (wo du hergegriffen wurdest), ebenfalls überlappungsfrei. Punkte kleiner & in konstanter Bildschirmgröße.
+- Flüssiges Zoomen (Render auf 1×/Frame gedrosselt). Im Browser verifiziert: 0 überlappende Labels bei 1,1× **und** 5×.
+
+---
+
 ## v2.7.0 — 28.06.2026
 
 ### 🗺️ „HERKÜNFTE"-Karten-Overlay (live)
