@@ -203,6 +203,15 @@ function syncProfileDropdown(){
   if(lbl) lbl.textContent = p ? p.n : 'Profil wählen…';
   document.querySelectorAll('.profile-item').forEach(el=>el.classList.toggle('active', el.dataset.id===currentProfile));
 }
-function toggleProfileDropdown(e){ if(e)e.stopPropagation(); const p=document.getElementById('profile-dd-panel'); if(p)p.classList.toggle('open'); }
+function toggleProfileDropdown(e){
+  if(e)e.stopPropagation();
+  const p=document.getElementById('profile-dd-panel');
+  if(p && !p.children.length) buildProfileDropdown();   // Lazy-Build: falls leer, jetzt bauen
+  if(p)p.classList.toggle('open');
+}
 function closeProfileDropdown(){ const p=document.getElementById('profile-dd-panel'); if(p)p.classList.remove('open'); }
 document.addEventListener('click', function(e){ const dd=document.getElementById('profile-dd'); if(dd && !dd.contains(e.target)) closeProfileDropdown(); });
+
+/* Selbst-Init (unabhängig von app.js) — wie beim Raketen-Stil-Select */
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ buildProfileDropdown(); syncProfileDropdown(); });
+else { buildProfileDropdown(); syncProfileDropdown(); }

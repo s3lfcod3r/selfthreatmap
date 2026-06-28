@@ -2,6 +2,14 @@
 
 ---
 
+## v2.5.1 — 28.06.2026
+
+### 🐛 Fix: Profil-Dropdown ließ sich nicht ausklappen
+- Auf der laufenden Instanz wurde das Profil-Panel beim Start nicht befüllt (0 Einträge) → Klick zeigte nichts
+- Jetzt **Selbst-Init** in `profiles.js` (wie beim Raketen-Stil-Select) **+ Lazy-Build**: klickt man auf das Profil-Dropdown und es ist leer, wird es sofort gebaut. An der Live-Instanz reproduziert, Fix im Browser verifiziert (54 Profile bauen & öffnen).
+
+---
+
 ## v2.5.0 — 28.06.2026
 
 ### 🎛️ 50+ Profile (Voreinstellungen)
