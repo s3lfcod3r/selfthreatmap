@@ -108,10 +108,11 @@ function renderOriginsOverlay(){
   locs.forEach(l=>{
     const p = proj([l.lon, l.lat]); if(!p) return;
     const r = 2 + Math.round((l.n/maxN) * 3);   // 2..5 px
+    const col = (typeof countColor==='function') ? countColor(l.n) : 'var(--accent)';  // grün→gelb→orange→rot nach Anzahl
     dotG.append('circle').attr('class','origin-dot')
       .attr('cx',p[0]).attr('cy',p[1]).attr('r',r*ik).attr('data-sr',r)
-      .attr('fill','var(--accent)').attr('fill-opacity',0.85)
-      .attr('stroke','#fff').attr('stroke-opacity',0.35).attr('stroke-width',0.8*ik)
+      .attr('fill',col).attr('fill-opacity',0.9)
+      .attr('stroke','rgba(0,8,14,0.55)').attr('stroke-width',0.8*ik)
       .append('title').text(cname(l.country)+(l.city?' · '+l.city:'')+': '+l.n);
   });
 

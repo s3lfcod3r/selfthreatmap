@@ -2,6 +2,13 @@
 
 ---
 
+## v2.7.2 — 28.06.2026
+
+### 🎨 Herkünfte-Punkte farbig
+- Die Punkte im HERKÜNFTE-Overlay sind jetzt nach Angriffszahl gefärbt: grün (wenig) → gelb → orange → rot (viele) — nutzt dieselbe Skala wie die Legende.
+
+---
+
 ## v2.7.1 — 28.06.2026
 
 ### 🗺️ HERKÜNFTE-Overlay: übersichtlich & ohne Überlappung
