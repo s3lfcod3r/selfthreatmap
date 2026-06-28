@@ -23,6 +23,8 @@ function bootstrapApp(){
 
   ensureAutoZoomOff();
   init();
+  // Gespeichertes Profil wiederherstellen (bleibt nach Reload erhalten)
+  try{ const sp=localStorage.getItem('stmProfile'); if(sp && typeof applyProfile==='function') applyProfile(sp); }catch(e){}
 }
 
 bootstrapApp();

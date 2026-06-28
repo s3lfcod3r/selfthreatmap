@@ -111,6 +111,13 @@
   #anim-toggle.on{border-color:var(--ok);color:var(--ok);background:rgba(0,255,136,0.08);}
   #anim-dot{width:7px;height:7px;border-radius:50%;background:rgba(160,255,216,0.3);transition:background 0.2s;flex-shrink:0;}
   #anim-toggle.on #anim-dot{background:var(--ok);box-shadow:0 0 6px var(--ok);}
+  /* HERKÜNFTE-Übersicht Toggle */
+  #toggle-row #origins-toggle{flex:1 1 0;justify-content:center;min-width:0;overflow:hidden;display:flex;align-items:center;gap:5px;background:rgba(0,20,40,0.85);border:1px solid var(--dim);border-radius:3px;padding:3px 4px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-size:7px;letter-spacing:0.3px;color:rgba(160,255,216,0.45);transition:all 0.2s;white-space:nowrap;user-select:none;}
+  #origins-toggle:hover{border-color:var(--accent);color:var(--accent);}
+  #origins-toggle.on{border-color:var(--accent);color:var(--accent);background:rgba(0,229,200,0.10);}
+  #origins-toggle span{overflow:hidden;text-overflow:ellipsis;}
+  #origins-dot{width:7px;height:7px;border-radius:50%;background:rgba(160,255,216,0.3);transition:background 0.2s;flex-shrink:0;}
+  #origins-toggle.on #origins-dot{background:var(--accent);box-shadow:0 0 6px var(--accent);}
 
   /* LINES TOGGLE BUTTON */
   #lines-toggle{
@@ -913,7 +920,7 @@
       <div id="map-title-overlay">
         <img id="h-logo" src="assets/logo/shield.png" alt="" width="16" height="20" aria-hidden="true" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(51,167,140,0.55))">
         <span id="h-title">Self<span>ThreatMap</span></span>
-        <span id="map-version-badge">v2.6.0</span>
+        <span id="map-version-badge">v2.7.0</span>
       </div>
       <svg id="base-svg" style="position:absolute;inset:0;width:100%;height:100%"></svg>
       <canvas id="arc-canvas"></canvas>
@@ -1053,6 +1060,10 @@
         <div id="autozoom-toggle" class="off" onclick="toggleAutoZoom()" title="Bei Angriff automatisch in die Region zoomen" aria-pressed="false">
           <div id="autozoom-dot"></div>
           <span id="autozoom-label">AUTO-ZOOM AUS</span>
+        </div>
+        <div id="origins-toggle" class="off" onclick="toggleOriginsOverlay()" title="Alle Angriffs-Länder als Punkte auf der Karte (mit Namen, live)" aria-pressed="false">
+          <div id="origins-dot"></div>
+          <span id="origins-label">HERKÜNFTE</span>
         </div>
       </div>
       <!-- Theme row: separate line below controls -->
@@ -1247,7 +1258,7 @@ let SERVER_NAME_MAP = 'MEIN-SERVER';
 // Ab hier nichts mehr ändern
 // ============================================================
 
-const APP_VERSION  = 'v2.6.0';
+const APP_VERSION  = 'v2.7.0';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;
@@ -2971,6 +2982,7 @@ function renderDots(){
   updateCountryFills();
   if(!animOn||!linesOn)clearArcCanvas();
   if(selectedDot){dotG.selectAll('.sel-ring').remove();}
+  if(typeof renderOriginsOverlay==='function')renderOriginsOverlay();
 }
 
 function countColor(n){if(n>=20)return'#f85149';if(n>=10)return'#ff6a3d';if(n>=5)return'#e3b341';return'#3fb950';}

@@ -2,6 +2,16 @@
 
 ---
 
+## v2.7.0 — 28.06.2026
+
+### 🗺️ „HERKÜNFTE"-Karten-Overlay (live)
+- Neuer Schalter **HERKÜNFTE** in der Toggle-Leiste: plottet **jedes Land, aus dem du je angegriffen wurdest, als Punkt auf der Karte** (Größe = Anzahl), dauerhaft mit Ländername + Zahl beschriftet. Aktualisiert sich **live** (über `renderDots`). Zustand gemerkt. Code: `assets/js/origins.js`.
+
+### 💾 Profil bleibt nach Reload
+- Das gewählte Profil (z. B. „Bernstein", „Matrix-Modus") wird im Browser gespeichert und beim Neuladen **automatisch wiederhergestellt** (inkl. Theme, Stil, Schalter, Dichte).
+
+---
+
 ## v2.6.0 — 28.06.2026
 
 ### 🗺️ Angriffs-Herkünfte-Übersicht
