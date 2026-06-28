@@ -2,6 +2,18 @@
 
 ---
 
+## v2.5.0 — 28.06.2026
+
+### 🎛️ 50+ Profile (Voreinstellungen)
+- Neues **Profil-Dropdown** oben (wie Theme/Sprache) mit **54 Voreinstellungen** in 7 Gruppen — ein Klick setzt Bahn-Stil + Theme + Animation + Angriffe an/aus + Auto-Zoom + Spawn-Modus + Dichte auf einmal
+- Beispiele: „Alle Angriffe (Console)", „Alle Angriffspunkte" (statisch), „Maximale Action", „Kometen-Regen", „Laser-Show", „Matrix-Modus", „Cyberpunk", „Brute-Force-Jagd", „Kino-Modus", „Performance-schonend" u. v. m.
+- Code: `assets/js/profiles.js` — leicht erweiterbar; im Browser verifiziert (alle Profile setzen korrekt Stil/Theme/Schalter/Dichte)
+
+### 🏙️ Stadtnamen bis zum Maximalzoom
+- Fix: Städtenamen verschwanden bei exakt 25× (Maximalzoom), weil das Gate `>=` war. Jetzt `>` → Namen bleiben bis ganz nah sichtbar. Default „bis Zoom" auf **25** angehoben.
+
+---
+
 ## v2.4.1 — 27.06.2026
 
 ### 🏙️ Stadtnamen-Zoom bis 25

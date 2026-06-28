@@ -10,6 +10,7 @@ function bootstrapApp(){
   syncMapToggleStates();
   applyLang();
   if(typeof buildLangDropdown==='function'){buildLangDropdown();syncLangDropdown();}
+  if(typeof buildProfileDropdown==='function'){buildProfileDropdown();syncProfileDropdown();}
 
   document.getElementById('set-override-coords')?.addEventListener('change',syncSettingsFormDisabled);
   document.getElementById('set-spawn-mode')?.addEventListener('change',updateSpawnModeHint);
