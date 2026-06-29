@@ -70,12 +70,14 @@
     <label for="p">Passwort</label>
     <input id="p" name="password" type="password" autocomplete="current-password" required>
 
-    <label for="t">2FA-Code (Authenticator)</label>
-    <input id="t" name="totp" type="text" inputmode="numeric" pattern="[0-9]*"
-           maxlength="6" placeholder="000000" autocomplete="one-time-code" required>
+    <div id="totp-wrap" style="display:none;">
+      <label for="t">2FA-Code (Authenticator)</label>
+      <input id="t" name="totp" type="text" inputmode="numeric" pattern="[0-9]*"
+             maxlength="6" placeholder="000000" autocomplete="one-time-code">
+    </div>
 
     <button type="submit">Anmelden</button>
-    <p class="foot">Geschuetzt durch Passwort + Zwei-Faktor-Authentifizierung</p>
+    <p class="foot" id="foot">Geschuetzt durch Passwort</p>
   </form>
   <script>
     if (new URLSearchParams(location.search).get('error')) {
@@ -83,6 +85,15 @@
       var rt = new URLSearchParams(location.search).get('retry');
       if (rt) e.textContent = 'Zu viele Versuche. Bitte ' + rt + 's warten.';
     }
+    // Erststart -> Setup; 2FA-Feld nur zeigen wenn aktiviert
+    fetch('/auth/status', {cache:'no-store'}).then(r=>r.json()).then(s=>{
+      if (!s.setup_done) { location.href = '/auth/setup'; return; }
+      if (s.totp_enabled) {
+        document.getElementById('totp-wrap').style.display = '';
+        document.getElementById('t').setAttribute('required','');
+        document.getElementById('foot').textContent = 'Geschuetzt durch Passwort + Zwei-Faktor (2FA)';
+      }
+    }).catch(function(){});
   </script>
 </body>
 </html>

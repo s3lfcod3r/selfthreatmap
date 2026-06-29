@@ -2,6 +2,17 @@
 
 ---
 
+## v2.9.0 — 29.06.2026
+
+### 🧙 Setup-Assistent + Einstellungen statt ENV-Secrets
+- **Ersteinrichtung im Browser**: Beim ersten Aufruf legt man Benutzer + Passwort selbst an ([`setup.html`](setup.html)) — keine Zugangsdaten mehr im Unraid-Template / in ENV-Variablen.
+- **Einstellungen-Seite** ([`settings.html`](settings.html), erreichbar unter `/settings`): Passwort ändern und **2FA optional per QR-Code** aktivieren/deaktivieren. QR-Code lokal erzeugt (gebündelte MIT-Lib `assets/vendor/qrcode.min.js`, kein CDN). Login zeigt das 2FA-Feld nur, wenn 2FA aktiv ist.
+- **Persistenz im `/config`-Volume** (`auth.json`): Konto + 2FA + Session-Schlüssel überleben Container-Updates. **Wichtig: `/config` als Volume mounten.** Damit entfällt das alte „Secrets bei Neustart weg"-Problem komplett.
+- `auth.py` auf Datei-Store umgebaut (Konto-Verwaltung, optionales TOTP); neue Endpunkte `/auth/setup`, `/auth/status`, `/auth/password`, `/auth/2fa/init|enable|disable`, `/settings`. nginx: `/auth/`-Prefix + geschützte `/settings`.
+- **Template/Compose vereinfacht**: nur noch `AUTH_ENABLED` + `COOKIE_SECURE` + `/config`-Volume; `ADMIN_*`/`TOTP_SECRET`/`SESSION_SECRET` entfernt. Auth-Flow lokal getestet (Setup/Login/2FA an+aus/Session/Persistenz grün).
+
+---
+
 ## v2.8.0 — 29.06.2026
 
 ### 🔐 Login + Zwei-Faktor (2FA) — Dashboard-Zugangsschutz

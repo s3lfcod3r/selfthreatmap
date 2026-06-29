@@ -60,18 +60,25 @@ export CROWDSEC_RESTART_WAIT="${CROWDSEC_RESTART_WAIT:-15}"
 export CROWDSEC_RESTART_COOLDOWN="${CROWDSEC_RESTART_COOLDOWN:-300}"
 
 # ── Login + 2FA (Auth) ──
+# Konto + 2FA werden beim ersten Aufruf im Browser eingerichtet und in
+# CONFIG_DIR/auth.json gespeichert (persistentes /config-Volume!).
 export AUTH_ENABLED="${AUTH_ENABLED:-true}"
-export ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
-export ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
-export ADMIN_PASSWORD_HASH="${ADMIN_PASSWORD_HASH:-}"
-export TOTP_SECRET="${TOTP_SECRET:-}"
-export SESSION_SECRET="${SESSION_SECRET:-}"
+export CONFIG_DIR="${CONFIG_DIR:-/config}"
 export SESSION_TTL="${SESSION_TTL:-86400}"
 export COOKIE_SECURE="${COOKIE_SECURE:-false}"
 export LOGIN_MAX_FAILS="${LOGIN_MAX_FAILS:-5}"
 export LOGIN_LOCKOUT_SECONDS="${LOGIN_LOCKOUT_SECONDS:-900}"
 # Exporter bindet nur lokal; nginx proxied nach aussen
 export LISTEN_HOST="${LISTEN_HOST:-127.0.0.1}"
+
+# Config-Verzeichnis anlegen (für Konto/2FA-Daten)
+mkdir -p "$CONFIG_DIR" 2>/dev/null || true
+if [ "${AUTH_ENABLED}" = "true" ] && [ ! -f "$CONFIG_DIR/auth.json" ]; then
+    log "🆕 Kein Konto gefunden — Ersteinrichtung beim ersten Aufruf im Browser."
+    case "$CONFIG_DIR" in
+      /config) log "   ⚠️  Tipp: /config als Volume mounten, sonst ist das Konto nach einem Update weg!";;
+    esac
+fi
 
 export LANGUAGE="${LANGUAGE:-de}"
 
@@ -132,7 +139,7 @@ EXPORTER_PID=$!
 log "✅ Alles läuft!"
 log "   Dashboard: http://<EURE-IP>:8080  (Login erforderlich)"
 if [ "${AUTH_ENABLED:-true}" = "true" ]; then
-    log "   🔐 Login + 2FA aktiv — Zugangsdaten ggf. im Exporter-Log oben"
+    log "   🔐 Login aktiv — beim ersten Aufruf Konto anlegen (2FA in den Einstellungen)"
 else
     log "   ⚠️  AUTH_ENABLED=false — Dashboard ist OHNE Login erreichbar!"
 fi

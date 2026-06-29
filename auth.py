@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 # ============================================================
-# SelfThreatMap — Auth-Modul (Login + 2FA / TOTP)
+# SelfThreatMap — Auth-Modul (Setup-Assistent, Login, 2FA/TOTP)
 # Nur Python3-stdlib, keine externen Pakete.
 #
-#   • Passwort-Hashing:  PBKDF2-HMAC-SHA256 (200k Iterationen, Salt)
-#   • 2FA:               TOTP nach RFC 6238 (SHA1, 6 Stellen, 30s)
-#   • Session:           HMAC-SHA256-signiertes Cookie (HttpOnly/SameSite)
-#   • Brute-Force:       In-Memory Lockout pro IP
+#   • Erststart:  kein Konto -> Setup-Assistent im Browser
+#   • Passwort:   PBKDF2-HMAC-SHA256 (200k Iterationen, Salt)
+#   • 2FA:        optional, TOTP nach RFC 6238 (SHA1, 6 Stellen, 30s)
+#   • Session:    HMAC-SHA256-signiertes Cookie (HttpOnly/SameSite)
+#   • Persistenz: /config/auth.json (Volume) — ueberlebt Updates
 #
-# Alle Vergleiche laufen zeitkonstant (hmac.compare_digest).
+# Alle Geheimnis-Vergleiche laufen zeitkonstant (hmac.compare_digest).
 # ============================================================
 
 import os
 import hmac
-import time
 import json
+import time
 import base64
 import hashlib
 import secrets
 import struct
 import threading
 
-# ── Konfiguration aus Umgebungsvariablen ────────────────────
+# ── Konfiguration ───────────────────────────────────────────
 AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "true").strip().lower() == "true"
-ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin").strip() or "admin"
+CONFIG_DIR = os.environ.get("CONFIG_DIR", "/config").strip() or "/config"
+CRED_FILE = os.path.join(CONFIG_DIR, "auth.json")
 SESSION_TTL = int(os.environ.get("SESSION_TTL", "86400"))          # 24h
 SESSION_COOKIE = "stm_session"
+
+# Optionaler Override des Session-Schluessels (sonst in auth.json gespeichert)
+_ENV_SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
 
 # PBKDF2-Parameter
 _PBKDF2_ITER = 200_000
@@ -35,37 +40,30 @@ _PBKDF2_ALGO = "sha256"
 _MAX_FAILS = int(os.environ.get("LOGIN_MAX_FAILS", "5"))
 _LOCKOUT_SECONDS = int(os.environ.get("LOGIN_LOCKOUT_SECONDS", "900"))  # 15 min
 
-# Hinweise, die der Hauptprozess beim Start ausgeben soll
-STARTUP_NOTICES = []
-
+_store_lock = threading.RLock()
 _login_state = {}            # ip -> {"fails": int, "until": float}
 _login_lock = threading.Lock()
 
 
 # ── Passwort-Hashing ────────────────────────────────────────
 def hash_password(password):
-    """Erzeugt 'pbkdf2_sha256$iter$salt_hex$hash_hex'."""
     salt = secrets.token_bytes(16)
     dk = hashlib.pbkdf2_hmac(_PBKDF2_ALGO, password.encode("utf-8"), salt, _PBKDF2_ITER)
     return f"pbkdf2_{_PBKDF2_ALGO}${_PBKDF2_ITER}${salt.hex()}${dk.hex()}"
 
 
 def verify_password(password, stored):
-    """Prueft Passwort gegen gespeicherten Hash — zeitkonstant."""
     try:
         algo, iter_s, salt_hex, hash_hex = stored.split("$")
-        iterations = int(iter_s)
-        salt = bytes.fromhex(salt_hex)
-        expected = bytes.fromhex(hash_hex)
-        dk = hashlib.pbkdf2_hmac(algo.replace("pbkdf2_", ""), password.encode("utf-8"), salt, iterations)
-        return hmac.compare_digest(dk, expected)
+        dk = hashlib.pbkdf2_hmac(algo.replace("pbkdf2_", ""), password.encode("utf-8"),
+                                 bytes.fromhex(salt_hex), int(iter_s))
+        return hmac.compare_digest(dk, bytes.fromhex(hash_hex))
     except Exception:
         return False
 
 
 # ── TOTP (RFC 6238) ─────────────────────────────────────────
 def generate_totp_secret():
-    """Zufaelliges Base32-Secret (160 bit) ohne Padding."""
     return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
 
 
@@ -73,15 +71,13 @@ def totp_at(secret_b32, when=None, step=30, digits=6):
     pad = "=" * (-len(secret_b32) % 8)
     key = base64.b32decode(secret_b32.upper() + pad, casefold=True)
     counter = int((when if when is not None else time.time()) // step)
-    msg = struct.pack(">Q", counter)
-    h = hmac.new(key, msg, hashlib.sha1).digest()
+    h = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
     offset = h[-1] & 0x0F
     code = (struct.unpack(">I", h[offset:offset + 4])[0] & 0x7FFFFFFF) % (10 ** digits)
     return str(code).zfill(digits)
 
 
 def totp_verify(secret_b32, code, window=1):
-    """Prueft TOTP-Code mit +/- window Zeitfenstern (Uhren-Toleranz)."""
     if not secret_b32 or not code:
         return False
     code = str(code).strip().replace(" ", "")
@@ -101,6 +97,147 @@ def otpauth_url(secret_b32, account, issuer="SelfThreatMap"):
             f"&issuer={quote(issuer)}&algorithm=SHA1&digits=6&period=30")
 
 
+# ── Persistenter Store (/config/auth.json) ──────────────────
+def _load():
+    try:
+        with open(CRED_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save(store):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    tmp = CRED_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(store, f, indent=2)
+    try:
+        os.chmod(tmp, 0o600)
+    except Exception:
+        pass
+    os.replace(tmp, CRED_FILE)
+
+
+def is_setup_done():
+    s = _load()
+    return bool(s.get("username") and s.get("password_hash"))
+
+
+def get_username():
+    return _load().get("username", "")
+
+
+def totp_enabled():
+    s = _load()
+    return bool(s.get("totp_enabled") and s.get("totp_secret"))
+
+
+def _ensure_session_secret(store):
+    """Stellt sicher, dass ein Session-Schluessel existiert (in-place)."""
+    if _ENV_SESSION_SECRET:
+        return _ENV_SESSION_SECRET
+    if not store.get("session_secret"):
+        store["session_secret"] = secrets.token_hex(32)
+    return store["session_secret"]
+
+
+def session_key():
+    """Aktueller Session-Signierschluessel als Bytes."""
+    if _ENV_SESSION_SECRET:
+        return _ENV_SESSION_SECRET.encode("utf-8")
+    s = _load()
+    key = s.get("session_secret")
+    if not key:
+        # Noch kein Konto/Schluessel -> ephemerer Zufallswert (keine Sessions moeglich)
+        return b"__no_session_secret_configured__"
+    return key.encode("utf-8")
+
+
+# ── Konto-Verwaltung ────────────────────────────────────────
+USERNAME_MAXLEN = 32
+PASSWORD_MINLEN = 8
+
+
+def validate_username(name):
+    name = (name or "").strip()
+    if not (1 <= len(name) <= USERNAME_MAXLEN):
+        return None
+    if not all(c.isalnum() or c in "._-" for c in name):
+        return None
+    return name
+
+
+def create_account(username, password):
+    """Legt das erste Konto an. Gibt (ok, fehlermeldung) zurueck."""
+    with _store_lock:
+        if is_setup_done():
+            return False, "Konto existiert bereits"
+        uname = validate_username(username)
+        if not uname:
+            return False, "Ungültiger Benutzername (1–32 Zeichen: a–z, 0–9, . _ -)"
+        if len(password or "") < PASSWORD_MINLEN:
+            return False, f"Passwort zu kurz (mindestens {PASSWORD_MINLEN} Zeichen)"
+        store = {
+            "version": 1,
+            "username": uname,
+            "password_hash": hash_password(password),
+            "totp_secret": None,
+            "totp_enabled": False,
+        }
+        _ensure_session_secret(store)
+        _save(store)
+        return True, "ok"
+
+
+def verify_login(username, password, code):
+    """Login-Pruefung: Benutzer + Passwort (+ 2FA falls aktiviert)."""
+    store = _load()
+    if not store.get("password_hash"):
+        return False
+    user_ok = hmac.compare_digest(username or "", store.get("username", ""))
+    pass_ok = verify_password(password or "", store.get("password_hash", ""))
+    if store.get("totp_enabled") and store.get("totp_secret"):
+        totp_ok = totp_verify(store["totp_secret"], code or "")
+    else:
+        totp_ok = True
+    return user_ok and pass_ok and totp_ok
+
+
+def change_password(current, new):
+    with _store_lock:
+        store = _load()
+        if not verify_password(current or "", store.get("password_hash", "")):
+            return False, "Aktuelles Passwort falsch"
+        if len(new or "") < PASSWORD_MINLEN:
+            return False, f"Neues Passwort zu kurz (mindestens {PASSWORD_MINLEN} Zeichen)"
+        store["password_hash"] = hash_password(new)
+        _save(store)
+        return True, "ok"
+
+
+def enable_totp(secret, code):
+    """Aktiviert 2FA, wenn der eingegebene Code zum (pending) Secret passt."""
+    with _store_lock:
+        if not totp_verify(secret, code or ""):
+            return False, "Code stimmt nicht — bitte erneut versuchen"
+        store = _load()
+        store["totp_secret"] = secret
+        store["totp_enabled"] = True
+        _save(store)
+        return True, "ok"
+
+
+def disable_totp(password):
+    with _store_lock:
+        store = _load()
+        if not verify_password(password or "", store.get("password_hash", "")):
+            return False, "Passwort falsch"
+        store["totp_secret"] = None
+        store["totp_enabled"] = False
+        _save(store)
+        return True, "ok"
+
+
 # ── Session-Cookies (signiert) ──────────────────────────────
 def _b64u(raw):
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
@@ -110,18 +247,19 @@ def _b64u_dec(s):
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def make_session(username, secret_key):
+def make_session(username):
+    key = session_key()
     payload = {"u": username, "exp": int(time.time()) + SESSION_TTL}
     body = _b64u(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    sig = _b64u(hmac.new(secret_key, body.encode("ascii"), hashlib.sha256).digest())
+    sig = _b64u(hmac.new(key, body.encode("ascii"), hashlib.sha256).digest())
     return f"{body}.{sig}"
 
 
-def verify_session(token, secret_key):
-    """Gibt Username zurueck wenn Signatur gueltig und nicht abgelaufen, sonst None."""
+def verify_session(token):
     try:
+        key = session_key()
         body, sig = token.split(".", 1)
-        expected = _b64u(hmac.new(secret_key, body.encode("ascii"), hashlib.sha256).digest())
+        expected = _b64u(hmac.new(key, body.encode("ascii"), hashlib.sha256).digest())
         if not hmac.compare_digest(sig, expected):
             return None
         payload = json.loads(_b64u_dec(body))
@@ -147,11 +285,7 @@ def parse_cookies(cookie_header):
 def login_allowed(ip):
     with _login_lock:
         st = _login_state.get(ip)
-        if not st:
-            return True
-        if st.get("until", 0) > time.time():
-            return False
-        return True
+        return not (st and st.get("until", 0) > time.time())
 
 
 def login_retry_after(ip):
@@ -174,52 +308,3 @@ def record_login_failure(ip):
 def record_login_success(ip):
     with _login_lock:
         _login_state.pop(ip, None)
-
-
-# ── Effektive Anmeldedaten (beim Import einmalig bestimmt) ───
-def _resolve_credentials():
-    pw_hash = os.environ.get("ADMIN_PASSWORD_HASH", "").strip()
-    pw_plain = os.environ.get("ADMIN_PASSWORD", "").strip()
-    if pw_hash:
-        resolved_hash = pw_hash
-    elif pw_plain:
-        resolved_hash = hash_password(pw_plain)
-    else:
-        # Kein Passwort gesetzt -> sicheres Zufallspasswort generieren und anzeigen
-        gen = secrets.token_urlsafe(12)
-        resolved_hash = hash_password(gen)
-        STARTUP_NOTICES.append(
-            "Kein ADMIN_PASSWORD gesetzt — generiertes Passwort fuer Benutzer "
-            f"'{ADMIN_USERNAME}': {gen}  (jetzt notieren und ADMIN_PASSWORD setzen!)")
-
-    secret = os.environ.get("TOTP_SECRET", "").strip()
-    if not secret:
-        secret = generate_totp_secret()
-        STARTUP_NOTICES.append(
-            "Kein TOTP_SECRET gesetzt — neues 2FA-Secret generiert. In Authenticator-App "
-            "eintragen (Google Authenticator / SelfAuthenticator):")
-        STARTUP_NOTICES.append(f"  TOTP_SECRET={secret}")
-        STARTUP_NOTICES.append(f"  {otpauth_url(secret, ADMIN_USERNAME)}")
-        STARTUP_NOTICES.append(
-            "  Danach TOTP_SECRET als Umgebungsvariable setzen, damit es Neustarts ueberlebt.")
-
-    session_key = os.environ.get("SESSION_SECRET", "").strip()
-    if not session_key:
-        session_key = secrets.token_hex(32)
-        STARTUP_NOTICES.append(
-            "Kein SESSION_SECRET gesetzt — temporaeres generiert (alle Logins gehen bei "
-            "Neustart verloren). Fuer dauerhafte Sessions SESSION_SECRET setzen.")
-
-    return resolved_hash, secret, session_key.encode("utf-8")
-
-
-PASSWORD_HASH, TOTP_SECRET, SESSION_KEY = _resolve_credentials()
-
-
-def check_credentials(username, password, totp_code):
-    """Vollstaendige Anmeldepruefung: Benutzer + Passwort + 2FA."""
-    user_ok = hmac.compare_digest(username or "", ADMIN_USERNAME)
-    pass_ok = verify_password(password or "", PASSWORD_HASH)
-    totp_ok = totp_verify(TOTP_SECRET, totp_code or "")
-    # Alle Faktoren auswerten (kein Early-Return) — gegen User-Enumeration.
-    return user_ok and pass_ok and totp_ok

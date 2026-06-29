@@ -8,6 +8,10 @@ services:
       - "8080:8080"   # Dashboard → http://EURE-IP:8080
 
     volumes:
+      # ⚠️  PFLICHT für Login: persistenter Speicher für Konto + 2FA.
+      # Ohne dieses Volume ist der angelegte Benutzer nach einem Update weg!
+      - /EUER-PFAD/config:/config
+
       # ⚠️  PFLICHT: Pfad zu euren CrowdSec-Daten anpassen
       # Tipp: docker inspect crowdsec | grep -A5 "Mounts" → zeigt euren Datenpfad
       - /EUER-PFAD/data:/crowdsec/data:ro
@@ -58,19 +62,10 @@ services:
       # ──────────────────────────────────────────────
       # 🔐 LOGIN + 2FA (Zwei-Faktor) — schützt das ganze Dashboard
       # ──────────────────────────────────────────────
-      # Standardmäßig AKTIV. Beim ersten Start werden Passwort + 2FA-Secret
-      # generiert und EINMALIG ins Container-Log geschrieben:
-      #   docker logs selfthreatmap   → dort Passwort + TOTP-Secret ablesen
-      # Danach hier fest setzen, damit sie Neustarts überleben:
+      # Standardmäßig AKTIV. Beim ERSTEN Aufruf im Browser legst du Benutzer +
+      # Passwort an; 2FA aktivierst du danach in den Einstellungen (QR-Code).
+      # Die Daten liegen im /config-Volume (siehe oben) — daher Updates-fest.
       - AUTH_ENABLED=true
-      - ADMIN_USERNAME=admin
-      # Passwort im Klartext (wird intern gehasht) ODER ADMIN_PASSWORD_HASH nutzen:
-      # - ADMIN_PASSWORD=dein-sicheres-passwort
-      # 2FA-Secret (Base32) — aus dem Log übernehmen und hier eintragen:
-      # - TOTP_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-      # Session-Signierschlüssel (sonst gehen Logins bei Neustart verloren):
-      #   openssl rand -hex 32
-      # - SESSION_SECRET=dein-zufaelliger-hex-key
       # Wenn die Map nur über HTTPS (Reverse-Proxy) erreichbar ist:
       # - COOKIE_SECURE=true
       # Zugang komplett ohne Login (NUR vertrauenswürdiges LAN!):

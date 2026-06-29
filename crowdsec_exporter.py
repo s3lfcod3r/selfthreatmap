@@ -62,13 +62,17 @@ from datetime import datetime, timezone
 import sys
 import auth  # Login + 2FA (TOTP), Session-Cookies — siehe auth.py
 
-# Login-Seite einmalig laden (wird bei GET /auth/login ausgeliefert)
-_LOGIN_PAGE = b"<!doctype html><meta charset=utf-8><title>Login</title><form method=post action=/auth/login><input name=username placeholder=Benutzer><input name=password type=password placeholder=Passwort><input name=totp placeholder=2FA-Code><button>Anmelden</button></form>"
-try:
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "login.html"), "rb") as _lf:
-        _LOGIN_PAGE = _lf.read()
-except Exception:
-    pass
+# Auth-Seiten (Setup-Assistent, Login, Einstellungen) einmalig laden
+def _load_page(name, fallback):
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), name), "rb") as f:
+            return f.read()
+    except Exception:
+        return fallback
+
+_LOGIN_PAGE = _load_page("login.html", b"<!doctype html><meta charset=utf-8><title>Login</title><form method=post action=/auth/login><input name=username><input name=password type=password><input name=totp><button>Anmelden</button></form>")
+_SETUP_PAGE = _load_page("setup.html", b"<!doctype html><meta charset=utf-8><title>Setup</title><form method=post action=/auth/setup><input name=username><input name=password type=password><input name=password2 type=password><button>Konto erstellen</button></form>")
+_SETTINGS_PAGE = _load_page("settings.html", b"<!doctype html><meta charset=utf-8><title>Einstellungen</title><p>settings.html fehlt.</p>")
 
 ### ====================================================
 ### ⚙️  KONFIGURATION
@@ -1017,77 +1021,147 @@ class MetricsHandler(BaseHTTPRequestHandler):
         if not auth.AUTH_ENABLED:
             return "anonymous"
         cookies = auth.parse_cookies(self.headers.get("Cookie", ""))
-        return auth.verify_session(cookies.get(auth.SESSION_COOKIE, ""), auth.SESSION_KEY)
+        return auth.verify_session(cookies.get(auth.SESSION_COOKIE, ""))
 
-    def _unban_authorized(self):
-        # Fail-closed: ohne gueltige Login-Session kein Unban.
-        return self._request_user() is not None
+    def _require_user(self):
+        """Gibt Username zurueck oder sendet 401 und gibt None zurueck."""
+        user = self._request_user()
+        if user is None:
+            self._json_response(401, {"ok": False, "message": "Nicht angemeldet"})
+        return user
 
-    def _handle_login_post(self):
-        from urllib.parse import parse_qs
-        ip = self._client_ip()
-        if not auth.login_allowed(ip):
-            retry = auth.login_retry_after(ip)
-            self.send_response(303)
-            self.send_header("Location", f"/auth/login?error=1&retry={retry}")
-            self.end_headers()
-            return
+    def _read_json(self):
         length = int(self.headers.get("Content-Length", 0) or 0)
-        body = self.rfile.read(length).decode("utf-8", "replace") if length else ""
-        form = parse_qs(body)
-        username = (form.get("username", [""])[0]).strip()
-        password = form.get("password", [""])[0]
-        totp = (form.get("totp", [""])[0]).strip()
-        if auth.check_credentials(username, password, totp):
-            auth.record_login_success(ip)
-            token = auth.make_session(username, auth.SESSION_KEY)
-            log(f"🔓 Login erfolgreich: {username} von {ip}")
-            self.send_response(303)
-            self.send_header("Location", "/")
-            self._set_session_cookie(token)
-            self.end_headers()
-        else:
-            auth.record_login_failure(ip)
-            log(f"⛔ Login fehlgeschlagen von {ip}")
-            self.send_response(303)
-            self.send_header("Location", "/auth/login?error=1")
-            self.end_headers()
+        if not length:
+            return {}
+        import json as _json
+        try:
+            return _json.loads(self.rfile.read(length))
+        except Exception:
+            return {}
 
     def _set_session_cookie(self, token):
-        # Secure wird vom Reverse-Proxy (HTTPS) gesetzt; SameSite=Strict gegen CSRF.
+        # SameSite=Strict gegen CSRF; Secure wenn nur ueber HTTPS erreichbar.
         cookie = (f"{auth.SESSION_COOKIE}={token}; Path=/; HttpOnly; "
                   f"SameSite=Strict; Max-Age={auth.SESSION_TTL}")
         if os.environ.get("COOKIE_SECURE", "false").lower() == "true":
             cookie += "; Secure"
         self.send_header("Set-Cookie", cookie)
 
-    def do_POST(self):
-        import json as _json
-        if self.path == "/auth/login":
-            self._handle_login_post()
+    def _redirect(self, location, cookie_token=None):
+        self.send_response(303)
+        self.send_header("Location", location)
+        if cookie_token is not None:
+            self._set_session_cookie(cookie_token)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _serve_html(self, page):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(page)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(page)
+
+    # ── POST-Handler einzelner Auth-Aktionen ──
+    def _handle_setup_post(self):
+        from urllib.parse import parse_qs, quote
+        if auth.is_setup_done():
+            self._redirect("/auth/login")
             return
-        if self.path == "/unban":
-            if not self._unban_authorized():
-                self._json_response(401, {"success": False, "message": "Nicht autorisiert — bitte anmelden"})
-                return
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length)
-            try:
-                data = _json.loads(body)
-                ip = data.get("ip", "").strip()
-                if not ip:
-                    self._json_response(400, {"success": False, "message": "IP fehlt"})
-                    return
-                if not validate_ip(ip):
-                    self._json_response(400, {"success": False, "message": "Ungültige IP-Adresse"})
-                    return
-                ok, msg = run_unban(ip)
-                self._json_response(200, {"success": ok, "message": msg, "ip": ip})
-            except Exception as e:
-                log(f"❌ Unban-Request Fehler: {e}")
-                self._json_response(400, {"success": False, "message": "Anfrage fehlgeschlagen"})
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        form = parse_qs(self.rfile.read(length).decode("utf-8", "replace")) if length else {}
+        username = (form.get("username", [""])[0]).strip()
+        password = form.get("password", [""])[0]
+        password2 = form.get("password2", [""])[0]
+        if password != password2:
+            self._redirect("/auth/setup?error=" + quote("Die Passwörter stimmen nicht überein."))
+            return
+        ok, msg = auth.create_account(username, password)
+        if not ok:
+            self._redirect("/auth/setup?error=" + quote(msg))
+            return
+        log(f"✅ Administrator-Konto angelegt: {username}")
+        self._redirect("/settings", cookie_token=auth.make_session(username))
+
+    def _handle_login_post(self):
+        from urllib.parse import parse_qs
+        ip = self._client_ip()
+        if not auth.is_setup_done():
+            self._redirect("/auth/setup")
+            return
+        if not auth.login_allowed(ip):
+            self._redirect(f"/auth/login?error=1&retry={auth.login_retry_after(ip)}")
+            return
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        form = parse_qs(self.rfile.read(length).decode("utf-8", "replace")) if length else {}
+        username = (form.get("username", [""])[0]).strip()
+        password = form.get("password", [""])[0]
+        totp = (form.get("totp", [""])[0]).strip()
+        if auth.verify_login(username, password, totp):
+            auth.record_login_success(ip)
+            log(f"🔓 Login erfolgreich: {username} von {ip}")
+            self._redirect("/", cookie_token=auth.make_session(username))
         else:
-            self._json_response(404, {"error": "Not found"})
+            auth.record_login_failure(ip)
+            log(f"⛔ Login fehlgeschlagen von {ip}")
+            self._redirect("/auth/login?error=1")
+
+    def _handle_unban(self):
+        if self._request_user() is None:
+            self._json_response(401, {"success": False, "message": "Nicht autorisiert — bitte anmelden"})
+            return
+        data = self._read_json()
+        ip = (data.get("ip") or "").strip()
+        if not ip:
+            self._json_response(400, {"success": False, "message": "IP fehlt"})
+            return
+        if not validate_ip(ip):
+            self._json_response(400, {"success": False, "message": "Ungültige IP-Adresse"})
+            return
+        try:
+            ok, msg = run_unban(ip)
+            self._json_response(200, {"success": ok, "message": msg, "ip": ip})
+        except Exception as e:
+            log(f"❌ Unban-Request Fehler: {e}")
+            self._json_response(400, {"success": False, "message": "Anfrage fehlgeschlagen"})
+
+    def do_POST(self):
+        # Setup/Login: Formular-POST (kein Session-Zwang)
+        if self.path == "/auth/setup":
+            self._handle_setup_post(); return
+        if self.path == "/auth/login":
+            self._handle_login_post(); return
+        if self.path == "/unban":
+            self._handle_unban(); return
+
+        # Konto-Verwaltung: JSON-POST, erfordert gueltige Session
+        if self.path == "/auth/password":
+            if self._require_user() is None: return
+            d = self._read_json()
+            ok, msg = auth.change_password(d.get("current", ""), d.get("new", ""))
+            self._json_response(200 if ok else 400, {"ok": ok, "message": msg}); return
+        if self.path == "/auth/2fa/init":
+            user = self._require_user()
+            if user is None: return
+            secret = auth.generate_totp_secret()
+            self._json_response(200, {"ok": True, "secret": secret,
+                                      "otpauth_url": auth.otpauth_url(secret, user)}); return
+        if self.path == "/auth/2fa/enable":
+            if self._require_user() is None: return
+            d = self._read_json()
+            ok, msg = auth.enable_totp((d.get("secret") or "").strip(), (d.get("code") or "").strip())
+            if ok: log("🔐 2FA aktiviert")
+            self._json_response(200 if ok else 400, {"ok": ok, "message": msg}); return
+        if self.path == "/auth/2fa/disable":
+            if self._require_user() is None: return
+            d = self._read_json()
+            ok, msg = auth.disable_totp(d.get("password", ""))
+            if ok: log("🔓 2FA deaktiviert")
+            self._json_response(200 if ok else 400, {"ok": ok, "message": msg}); return
+
+        self._json_response(404, {"error": "Not found"})
 
     def _json_response(self, code, data, cors=False):
         # Same-Origin durch nginx-Proxy — kein Wildcard-CORS mehr (war: ACAO *).
@@ -1096,36 +1170,51 @@ class MetricsHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
-    def _serve_login_page(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(_LOGIN_PAGE)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(_LOGIN_PAGE)
-
     def do_GET(self):
+        path = self.path.split("?")[0]
         # ── Auth-Endpunkte (von nginx ohne auth_request durchgereicht) ──
-        if self.path.split("?")[0] == "/auth/login":
-            self._serve_login_page()
+        if path == "/auth/status":
+            user = self._request_user()
+            resp = {"setup_done": auth.is_setup_done(), "totp_enabled": auth.totp_enabled()}
+            if user and user != "anonymous":
+                resp["username"] = auth.get_username()
+            self._json_response(200, resp)
             return
-        if self.path == "/auth/verify":
-            # Fuer nginx auth_request: 200 = erlaubt, 401 = Login noetig.
-            if self._request_user() is not None:
-                self.send_response(200)
+        if path == "/auth/setup":
+            if auth.is_setup_done():
+                self._redirect("/auth/login")
             else:
-                self.send_response(401)
+                self._serve_html(_SETUP_PAGE)
+            return
+        if path == "/auth/login":
+            if not auth.is_setup_done():
+                self._redirect("/auth/setup")
+            else:
+                self._serve_html(_LOGIN_PAGE)
+            return
+        if path == "/settings":
+            # Durch nginx auth_request geschuetzt; zusaetzlich hier absichern.
+            if self._request_user() is None:
+                self._redirect("/auth/login")
+            else:
+                self._serve_html(_SETTINGS_PAGE)
+            return
+        if path == "/auth/verify":
+            # Fuer nginx auth_request: 200 = erlaubt, 401 = Login noetig.
+            self.send_response(200 if self._request_user() is not None else 401)
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if self.path == "/auth/logout":
+        if path == "/auth/logout":
             self.send_response(303)
             self.send_header("Location", "/auth/login")
             self.send_header("Set-Cookie",
                              f"{auth.SESSION_COOKIE}=; Path=/; HttpOnly; Max-Age=0")
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return
 
@@ -1189,16 +1278,15 @@ if __name__ == "__main__":
     log(f"   Port:   {LISTEN_PORT}")
     log(f"   TTL:    {CACHE_TTL}s")
     log(f"   Server: {SERVER_NAME} ({SERVER_LAT}, {SERVER_LON})")
-    if auth.AUTH_ENABLED:
-        log(f"   Login:  🔐 aktiv (Benutzer '{auth.ADMIN_USERNAME}' + 2FA/TOTP)")
-    else:
+    if not auth.AUTH_ENABLED:
         log("   Login:  ⚠️  DEAKTIVIERT (AUTH_ENABLED=false) — jeder im Netz hat Zugriff!")
+    elif auth.is_setup_done():
+        log(f"   Login:  🔐 aktiv (Benutzer '{auth.get_username()}'"
+            f"{', 2FA aktiv' if auth.totp_enabled() else ''})")
+    else:
+        log("   Login:  🆕 noch kein Konto — Ersteinrichtung im Browser beim ersten Aufruf")
+    log(f"   Config: {auth.CRED_FILE}")
     log("=" * 60)
-    # Generierte Zugangsdaten / 2FA-Secret EINMALIG anzeigen (falls nicht gesetzt)
-    for notice in auth.STARTUP_NOTICES:
-        log("🔑 " + notice)
-    if auth.STARTUP_NOTICES:
-        log("=" * 60)
 
     init_mmdb()
 

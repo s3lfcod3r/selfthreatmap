@@ -28,9 +28,10 @@
     - 10 Farbthemen, Sound-Alarm, CSV-Export&#xD;&#xA;
     - Vollständig responsive — Desktop und Mobile&#xD;&#xA;
     &#xD;&#xA;
-    WICHTIG: Beim ersten Start werden Passwort + 2FA-Secret EINMALIG ins&#xD;&#xA;
-    Container-Log geschrieben (Logs ansehen!). Danach ADMIN_PASSWORD,&#xD;&#xA;
-    TOTP_SECRET und SESSION_SECRET fest in den Variablen eintragen.&#xD;&#xA;
+    Beim ersten Aufruf im Browser legst du Benutzer + Passwort an;&#xD;&#xA;
+    2FA aktivierst du danach in den Einstellungen (QR-Code scannen).&#xD;&#xA;
+    WICHTIG: Das /config-Volume mounten, sonst ist der Login nach&#xD;&#xA;
+    einem Update weg.&#xD;&#xA;
     &#xD;&#xA;
     Voraussetzung: CrowdSec muss als Docker-Container auf Unraid laufen.&#xD;&#xA;
     &#xD;&#xA;
@@ -62,6 +63,17 @@
     Mask="false"></Config>
 
   <!-- ═══════ VOLUMES ═══════ -->
+  <Config
+    Name="Config (Login-Daten)"
+    Target="/config"
+    Default="/mnt/user/appdata/selfthreatmap"
+    Mode="rw"
+    Description="Persistenter Speicher für Benutzerkonto + 2FA-Einstellungen (auth.json). WICHTIG: Ohne dieses Volume ist der angelegte Login nach einem Container-Update weg. Empfohlen: /mnt/user/appdata/selfthreatmap"
+    Type="Path"
+    Display="always"
+    Required="true"
+    Mask="false">/mnt/user/appdata/selfthreatmap</Config>
+
   <Config
     Name="CrowdSec Datenpfad"
     Target="/crowdsec/data"
@@ -226,62 +238,18 @@
     Target="AUTH_ENABLED"
     Default="true"
     Mode=""
-    Description="Schützt das gesamte Dashboard mit Benutzername + Passwort + 2FA (TOTP). Dringend empfohlen. Nur auf false setzen, wenn die Map in einem komplett isolierten LAN läuft."
+    Description="Schützt das gesamte Dashboard mit Benutzername + Passwort + optionaler 2FA. Benutzer/Passwort werden beim ERSTEN Aufruf im Browser angelegt, 2FA danach in den Einstellungen (QR-Code). Nur auf false setzen, wenn die Map in einem komplett isolierten LAN läuft."
     Type="Variable"
     Display="always"
     Required="false"
     Mask="false">true</Config>
 
   <Config
-    Name="Benutzername (ADMIN_USERNAME)"
-    Target="ADMIN_USERNAME"
-    Default="admin"
-    Mode=""
-    Description="Anmeldename für das Dashboard."
-    Type="Variable"
-    Display="always"
-    Required="false"
-    Mask="false">admin</Config>
-
-  <Config
-    Name="Passwort (ADMIN_PASSWORD)"
-    Target="ADMIN_PASSWORD"
-    Default=""
-    Mode=""
-    Description="Anmeldepasswort. Leer lassen = beim ersten Start wird ein Zufallspasswort erzeugt und EINMALIG ins Container-Log geschrieben (Logs ansehen!). Danach hier fest eintragen."
-    Type="Variable"
-    Display="always"
-    Required="false"
-    Mask="true"></Config>
-
-  <Config
-    Name="2FA-Secret (TOTP_SECRET)"
-    Target="TOTP_SECRET"
-    Default=""
-    Mode=""
-    Description="Base32-Secret für die Authenticator-App (Google Authenticator / SelfAuthenticator). Leer lassen = beim ersten Start wird ein Secret + QR-Link ins Log geschrieben. Diesen Wert dann hier eintragen, damit er Neustarts überlebt."
-    Type="Variable"
-    Display="always"
-    Required="false"
-    Mask="true"></Config>
-
-  <Config
-    Name="Session-Schlüssel (SESSION_SECRET)"
-    Target="SESSION_SECRET"
-    Default=""
-    Mode=""
-    Description="Signierschlüssel für Login-Sessions (z.B. openssl rand -hex 32). Wird einer nicht gesetzt, werden alle Logins bei jedem Neustart ungültig."
-    Type="Variable"
-    Display="advanced"
-    Required="false"
-    Mask="true"></Config>
-
-  <Config
     Name="Cookie nur über HTTPS (COOKIE_SECURE)"
     Target="COOKIE_SECURE"
     Default="false"
     Mode=""
-    Description="Auf true setzen, wenn das Dashboard ausschließlich über HTTPS (Reverse-Proxy) erreichbar ist. Dann wird das Session-Cookie nur verschlüsselt übertragen."
+    Description="Auf true setzen, wenn das Dashboard ausschließlich über HTTPS (Reverse-Proxy) erreichbar ist. Dann wird das Login-Cookie nur verschlüsselt übertragen."
     Type="Variable"
     Display="advanced"
     Required="false"

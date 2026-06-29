@@ -1097,6 +1097,8 @@
           <div id="lang-dd-panel"></div>
         </div>
         <button type="button" id="settings-open-btn" class="settings-open-btn" onclick="openSettingsModal()" title="Einstellungen">⚙ <span id="settings-open-lbl">EINST.</span></button>
+        <a id="account-link" class="settings-open-btn" href="/settings" title="Konto &amp; Sicherheit (2FA)" style="display:none;text-decoration:none;">👤</a>
+        <a id="logout-link" class="settings-open-btn" href="/auth/logout" title="Abmelden" style="display:none;text-decoration:none;">⎋</a>
       </div>
     </div>
     <div id="tabs">
@@ -3281,6 +3283,14 @@ document.addEventListener('click',function(ev){
   else if(a==='filter-scenario'){ev.stopPropagation();filterByScenario(el.dataset.scenario);}
   else if(a==='filter-country'){ev.stopPropagation();filterByCountry(el.dataset.country);}
 });
+
+// Konto-/Abmelden-Links nur zeigen, wenn Login aktiv ist (Konto eingerichtet)
+fetch('/auth/status',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+  if(s&&s.setup_done){
+    const a=document.getElementById('account-link'), l=document.getElementById('logout-link');
+    if(a)a.style.display=''; if(l)l.style.display='';
+  }
+}).catch(function(){});
 
 // ── SELECTED DOT ──
 function clearSelection(){

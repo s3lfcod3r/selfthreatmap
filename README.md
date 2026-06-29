@@ -7,7 +7,7 @@
 **Live attack map straight from your local CrowdSec database**
 **Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank**
 
-[![Version](https://img.shields.io/badge/version-v2.8.0-33a78c?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.9.0-33a78c?style=flat-square)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-GPL--3.0-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Docker%20%7C%20Unraid-1db8d4?style=flat-square)](#-installation)
 [![Python](https://img.shields.io/badge/python-3.12-9dbdd0?style=flat-square&logo=python&logoColor=white)](crowdsec_exporter.py)
@@ -92,17 +92,17 @@ The signature feature: how each attack travels from its origin to your server. P
 | `WHITELIST_ENABLED` | `true` | Dynamic self-IP whitelist |
 | `WHITELIST_INTERVAL` | `900` | Whitelist check interval (seconds) |
 | `AUTH_ENABLED` | `true` | **Login + 2FA** gate for the whole dashboard |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / *(auto)* | Login credentials (random password logged on first start if unset) |
-| `TOTP_SECRET` | *(auto)* | Base32 2FA secret (generated + logged on first start) |
-| `SESSION_SECRET` | *(auto)* | HMAC key for login sessions (set it to survive restarts) |
 | `COOKIE_SECURE` | `false` | Set `true` when served over HTTPS only |
+| `CONFIG_DIR` | `/config` | Where account + 2FA data is stored (mount as a volume!) |
 | `CACHE_TTL` / `DAYS_BACK` | `60` / `365` | Metric cache & history window |
+
+> 🔑 **First run:** open the dashboard, create your admin **user + password** in the browser. Two-factor (TOTP) is **optional** — enable it afterwards under **Settings** by scanning the QR code with an authenticator app (Google Authenticator / SelfAuthenticator). All credentials live in `CONFIG_DIR/auth.json`, so **mount `/config` as a persistent volume**.
 
 ## 🔒 Security
 
-The dashboard is protected by **username + password + two-factor (TOTP)** — `AUTH_ENABLED=true` by default. On first start a random password and a 2FA secret (with an `otpauth://` enrolment link) are written **once** to the container log (`docker logs selfthreatmap`); add them to a TOTP app (Google Authenticator / SelfAuthenticator) and pin `ADMIN_PASSWORD` / `TOTP_SECRET` / `SESSION_SECRET` afterwards.
+On first visit you set up an admin account in the browser (no secrets in env vars). **2FA is optional** and managed under Settings. The account lives in the `/config` volume, so it survives container updates.
 
-The dashboard can lift CrowdSec bans via the Docker socket, so still treat port **8080 like an admin UI**: keep it on LAN/VPN, and put it behind HTTPS (set `COOKIE_SECURE=true`) if reachable from outside. Login brute-force is rate-limited and locks out after repeated failures.
+The dashboard can lift CrowdSec bans via the Docker socket, so treat port **8080 like an admin UI**: keep it on LAN/VPN, and put it behind HTTPS (set `COOKIE_SECURE=true`) if reachable from outside. Login brute-force is rate-limited and locks out after repeated failures.
 
 ---
 
@@ -139,9 +139,9 @@ Das Herzstück: wie jeder Angriff von der Quelle zu deinem Server fliegt. **Übe
 
 ### 🔒 Sicherheit
 
-Das Dashboard ist mit **Benutzername + Passwort + Zwei-Faktor (TOTP)** geschützt — `AUTH_ENABLED=true` ist Standard. Beim **ersten Start** werden ein Zufallspasswort und ein 2FA-Secret (inkl. `otpauth://`-Link) **einmalig ins Container-Log** geschrieben (`docker logs selfthreatmap`): in eine Authenticator-App eintragen (Google Authenticator / SelfAuthenticator) und danach `ADMIN_PASSWORD` / `TOTP_SECRET` / `SESSION_SECRET` fest setzen.
+Beim **ersten Aufruf** legst du im Browser ein Admin-Konto an (Benutzer + Passwort) — keine Geheimnisse mehr in Umgebungsvariablen. **2FA ist optional** und wird danach in den **Einstellungen** per QR-Code aktiviert (Authenticator-App: Google Authenticator / SelfAuthenticator). Das Konto liegt im **`/config`-Volume** und übersteht so Container-Updates — dieses Volume **muss gemountet** sein.
 
-Das Dashboard kann über den Docker-Socket CrowdSec-Bans aufheben — behandle Port **8080 weiterhin wie eine Admin-Oberfläche**: nur im LAN/VPN nutzen und bei externer Erreichbarkeit hinter HTTPS legen (`COOKIE_SECURE=true`). Fehl-Logins sind rate-limitiert und werden nach mehreren Versuchen gesperrt.
+Das Dashboard kann über den Docker-Socket CrowdSec-Bans aufheben — behandle Port **8080 wie eine Admin-Oberfläche**: nur im LAN/VPN nutzen und bei externer Erreichbarkeit hinter HTTPS legen (`COOKIE_SECURE=true`). Fehl-Logins sind rate-limitiert und werden nach mehreren Versuchen gesperrt.
 
 ### 🗺️ GeoIP / Stadtnamen
 
