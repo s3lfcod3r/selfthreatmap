@@ -20,12 +20,17 @@
     Echtzeit-Angriffskarte direkt aus eurer lokalen CrowdSec-Datenbank.&#xD;&#xA;
     &#xD;&#xA;
     Features:&#xD;&#xA;
+    - Login + 2FA (TOTP) schützt das gesamte Dashboard (standardmäßig aktiv)&#xD;&#xA;
     - Interaktive Weltkarte mit animierten Angriffspfeilen (D3.js)&#xD;&#xA;
     - Live-Feed mit Suche, Filter und Pagination&#xD;&#xA;
     - Ban-Status-Anzeige und IP-Unban direkt aus dem Dashboard&#xD;&#xA;
     - Dynamische IP-Whitelist (verhindert Selbst-Ban bei IP-Wechsel)&#xD;&#xA;
-    - 4 Farbthemen, Sound-Alarm, CSV-Export&#xD;&#xA;
+    - 10 Farbthemen, Sound-Alarm, CSV-Export&#xD;&#xA;
     - Vollständig responsive — Desktop und Mobile&#xD;&#xA;
+    &#xD;&#xA;
+    WICHTIG: Beim ersten Start werden Passwort + 2FA-Secret EINMALIG ins&#xD;&#xA;
+    Container-Log geschrieben (Logs ansehen!). Danach ADMIN_PASSWORD,&#xD;&#xA;
+    TOTP_SECRET und SESSION_SECRET fest in den Variablen eintragen.&#xD;&#xA;
     &#xD;&#xA;
     Voraussetzung: CrowdSec muss als Docker-Container auf Unraid laufen.&#xD;&#xA;
     &#xD;&#xA;
@@ -84,7 +89,7 @@
     Target="/var/run/docker.sock"
     Default="/var/run/docker.sock"
     Mode="ro"
-    Description="Docker Socket — wird für IP-Unban und dynamische Whitelist (CrowdSec-Neustart) benötigt."
+    Description="Docker Socket — wird für IP-Unban und dynamische Whitelist (CrowdSec-Neustart) benötigt. SICHERHEITSHINWEIS: Gibt faktisch Root-Rechte auf dem Host (':ro' schützt NICHT). Nur einbinden, wenn Unban/Whitelist-Restart gebraucht werden, sonst diese Zuordnung entfernen."
     Type="Path"
     Display="always"
     Required="false"
