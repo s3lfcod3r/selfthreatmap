@@ -10,7 +10,8 @@ import os
 import ipaddress
 
 CROWDSEC_CONTAINER = os.environ.get("CROWDSEC_CONTAINER_NAME", "crowdsec")
-UNBAN_API_TOKEN = os.environ.get("UNBAN_API_TOKEN", "").strip()
+# Unban-Autorisierung laeuft jetzt ueber die Login-Session (siehe auth.py),
+# nicht mehr ueber ein statisches API-Token.
 
 def validate_ip(ip):
     """IPv4/IPv6 prüfen — Schutz vor ungültigen cscli-Argumenten und YAML-Injection."""
@@ -59,6 +60,15 @@ from collections import deque
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timezone
 import sys
+import auth  # Login + 2FA (TOTP), Session-Cookies — siehe auth.py
+
+# Login-Seite einmalig laden (wird bei GET /auth/login ausgeliefert)
+_LOGIN_PAGE = b"<!doctype html><meta charset=utf-8><title>Login</title><form method=post action=/auth/login><input name=username placeholder=Benutzer><input name=password type=password placeholder=Passwort><input name=totp placeholder=2FA-Code><button>Anmelden</button></form>"
+try:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "login.html"), "rb") as _lf:
+        _LOGIN_PAGE = _lf.read()
+except Exception:
+    pass
 
 ### ====================================================
 ### ⚙️  KONFIGURATION
@@ -68,7 +78,9 @@ import sys
 DB_PATH      = os.environ.get("CROWDSEC_DB_PATH",    "/crowdsec/data/crowdsec.db")
 MMDB_PATH    = os.environ.get("CROWDSEC_MMDB_PATH",  "/crowdsec/data/GeoLite2-City.mmdb")
 LISTEN_PORT  = int(os.environ.get("LISTEN_PORT",     "9456"))
-LISTEN_HOST  = "0.0.0.0"
+# Nur lokal binden — nginx (localhost) proxied nach aussen. Schuetzt /unban
+# davor, dass andere Container im Docker-Netz den Exporter direkt erreichen.
+LISTEN_HOST  = os.environ.get("LISTEN_HOST",         "127.0.0.1")
 CACHE_TTL    = int(os.environ.get("CACHE_TTL",       "60"))
 DAYS_BACK    = int(os.environ.get("DAYS_BACK",       "365"))
 
@@ -785,7 +797,8 @@ def load_drops():
 
 def load_metrics():
     if not os.path.exists(DB_PATH):
-        return f"# ERROR: DB nicht gefunden: {DB_PATH}\n"
+        log(f"❌ DB nicht gefunden: {DB_PATH}")
+        return "# ERROR: Datenbank nicht verfuegbar\n"
 
     cutoff    = int(time.time()) - (DAYS_BACK * 86400)
     lines     = []
@@ -973,7 +986,7 @@ def load_metrics():
 
     except Exception as e:
         log(f"❌ DB-Fehler: {e}")
-        return f"# ERROR: {e}\n"
+        return "# ERROR: Metriken konnten nicht geladen werden\n"
 
     return "\n".join(lines) + "\n"
 
@@ -992,21 +1005,70 @@ def get_metrics():
 # HTTP Server
 # ---------------------------------------------------------------------------
 class MetricsHandler(BaseHTTPRequestHandler):
+    def _client_ip(self):
+        # Hinter nginx steht die echte IP im X-Forwarded-For (erster Eintrag)
+        xff = self.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+        return self.client_address[0] if self.client_address else "?"
+
+    def _request_user(self):
+        """Username aus gueltiger Session-Cookie, oder None. Bei AUTH_ENABLED=false offen."""
+        if not auth.AUTH_ENABLED:
+            return "anonymous"
+        cookies = auth.parse_cookies(self.headers.get("Cookie", ""))
+        return auth.verify_session(cookies.get(auth.SESSION_COOKIE, ""), auth.SESSION_KEY)
+
     def _unban_authorized(self):
-        if not UNBAN_API_TOKEN:
-            return True
-        token = self.headers.get("X-API-Token", "").strip()
-        if not token:
-            auth = self.headers.get("Authorization", "")
-            if auth.lower().startswith("bearer "):
-                token = auth[7:].strip()
-        return token == UNBAN_API_TOKEN
+        # Fail-closed: ohne gueltige Login-Session kein Unban.
+        return self._request_user() is not None
+
+    def _handle_login_post(self):
+        from urllib.parse import parse_qs
+        ip = self._client_ip()
+        if not auth.login_allowed(ip):
+            retry = auth.login_retry_after(ip)
+            self.send_response(303)
+            self.send_header("Location", f"/auth/login?error=1&retry={retry}")
+            self.end_headers()
+            return
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        body = self.rfile.read(length).decode("utf-8", "replace") if length else ""
+        form = parse_qs(body)
+        username = (form.get("username", [""])[0]).strip()
+        password = form.get("password", [""])[0]
+        totp = (form.get("totp", [""])[0]).strip()
+        if auth.check_credentials(username, password, totp):
+            auth.record_login_success(ip)
+            token = auth.make_session(username, auth.SESSION_KEY)
+            log(f"🔓 Login erfolgreich: {username} von {ip}")
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self._set_session_cookie(token)
+            self.end_headers()
+        else:
+            auth.record_login_failure(ip)
+            log(f"⛔ Login fehlgeschlagen von {ip}")
+            self.send_response(303)
+            self.send_header("Location", "/auth/login?error=1")
+            self.end_headers()
+
+    def _set_session_cookie(self, token):
+        # Secure wird vom Reverse-Proxy (HTTPS) gesetzt; SameSite=Strict gegen CSRF.
+        cookie = (f"{auth.SESSION_COOKIE}={token}; Path=/; HttpOnly; "
+                  f"SameSite=Strict; Max-Age={auth.SESSION_TTL}")
+        if os.environ.get("COOKIE_SECURE", "false").lower() == "true":
+            cookie += "; Secure"
+        self.send_header("Set-Cookie", cookie)
 
     def do_POST(self):
         import json as _json
+        if self.path == "/auth/login":
+            self._handle_login_post()
+            return
         if self.path == "/unban":
             if not self._unban_authorized():
-                self._json_response(401, {"success": False, "message": "Nicht autorisiert"}, cors=False)
+                self._json_response(401, {"success": False, "message": "Nicht autorisiert — bitte anmelden"})
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
@@ -1014,50 +1076,64 @@ class MetricsHandler(BaseHTTPRequestHandler):
                 data = _json.loads(body)
                 ip = data.get("ip", "").strip()
                 if not ip:
-                    self._json_response(400, {"success": False, "message": "IP fehlt"}, cors=False)
+                    self._json_response(400, {"success": False, "message": "IP fehlt"})
                     return
                 if not validate_ip(ip):
-                    self._json_response(400, {"success": False, "message": "Ungültige IP-Adresse"}, cors=False)
+                    self._json_response(400, {"success": False, "message": "Ungültige IP-Adresse"})
                     return
                 ok, msg = run_unban(ip)
-                self._json_response(200, {"success": ok, "message": msg, "ip": ip}, cors=False)
+                self._json_response(200, {"success": ok, "message": msg, "ip": ip})
             except Exception as e:
-                self._json_response(400, {"success": False, "message": str(e)}, cors=False)
+                log(f"❌ Unban-Request Fehler: {e}")
+                self._json_response(400, {"success": False, "message": "Anfrage fehlgeschlagen"})
         else:
-            self._json_response(404, {"error": "Not found"}, cors=False)
+            self._json_response(404, {"error": "Not found"})
 
-    def _json_response(self, code, data, cors=True):
+    def _json_response(self, code, data, cors=False):
+        # Same-Origin durch nginx-Proxy — kein Wildcard-CORS mehr (war: ACAO *).
         import json as _json
         body = _json.dumps(data).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        if cors:
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
         self.end_headers()
         self.wfile.write(body)
 
-    def do_OPTIONS(self):
-        """CORS Preflight — nur für lesende Endpunkte, nicht für /unban"""
-        if self.path == "/unban":
-            self.send_response(405)
-            self.end_headers()
-            return
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    def _serve_login_page(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(_LOGIN_PAGE)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
+        self.wfile.write(_LOGIN_PAGE)
 
     def do_GET(self):
+        # ── Auth-Endpunkte (von nginx ohne auth_request durchgereicht) ──
+        if self.path.split("?")[0] == "/auth/login":
+            self._serve_login_page()
+            return
+        if self.path == "/auth/verify":
+            # Fuer nginx auth_request: 200 = erlaubt, 401 = Login noetig.
+            if self._request_user() is not None:
+                self.send_response(200)
+            else:
+                self.send_response(401)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if self.path == "/auth/logout":
+            self.send_response(303)
+            self.send_header("Location", "/auth/login")
+            self.send_header("Set-Cookie",
+                             f"{auth.SESSION_COOKIE}=; Path=/; HttpOnly; Max-Age=0")
+            self.end_headers()
+            return
+
         if self.path in ("/metrics", "/"):
             body = get_metrics().encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/whitelist-status":
@@ -1066,7 +1142,6 @@ class MetricsHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/config":
@@ -1079,7 +1154,6 @@ class MetricsHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
         elif self.path == "/drops":
@@ -1115,11 +1189,16 @@ if __name__ == "__main__":
     log(f"   Port:   {LISTEN_PORT}")
     log(f"   TTL:    {CACHE_TTL}s")
     log(f"   Server: {SERVER_NAME} ({SERVER_LAT}, {SERVER_LON})")
-    if UNBAN_API_TOKEN:
-        log("   Unban:  API-Token aktiv")
+    if auth.AUTH_ENABLED:
+        log(f"   Login:  🔐 aktiv (Benutzer '{auth.ADMIN_USERNAME}' + 2FA/TOTP)")
     else:
-        log("   Unban:  ⚠️  kein API-Token — nur im vertrauenswürdigen LAN nutzen")
+        log("   Login:  ⚠️  DEAKTIVIERT (AUTH_ENABLED=false) — jeder im Netz hat Zugriff!")
     log("=" * 60)
+    # Generierte Zugangsdaten / 2FA-Secret EINMALIG anzeigen (falls nicht gesetzt)
+    for notice in auth.STARTUP_NOTICES:
+        log("🔑 " + notice)
+    if auth.STARTUP_NOTICES:
+        log("=" * 60)
 
     init_mmdb()
 

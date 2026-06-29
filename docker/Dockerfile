@@ -5,16 +5,18 @@ LABEL org.opencontainers.image.description="Echtzeit-Angriffskarte fuer CrowdSec
 LABEL org.opencontainers.image.source="https://github.com/s3lfcod3r/selfthreatmap"
 LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
 LABEL org.opencontainers.image.authors="s3lfcod3r"
-LABEL org.opencontainers.image.version="1.5.1"
+LABEL org.opencontainers.image.version="2.8.0"
 
-# nginx fuer Dashboard + docker-cli fuer Unban via docker exec
+# nginx (inkl. auth_request-Modul) fuer Dashboard + docker-cli fuer Unban
 RUN apk add --no-cache nginx docker-cli curl
 
 # App-Verzeichnisse
 RUN mkdir -p /app /crowdsec/data /crowdsec/postoverflows /var/www/html /run/nginx
 
-# Exporter
+# Exporter + Auth-Modul + Login-Seite
 COPY crowdsec_exporter.py /app/crowdsec_exporter.py
+COPY auth.py /app/auth.py
+COPY login.html /app/login.html
 
 # Dashboard
 COPY index.html /var/www/html/index.html

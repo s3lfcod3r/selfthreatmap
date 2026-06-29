@@ -215,16 +215,72 @@
     Required="false"
     Mask="false">15</Config>
 
+  <!-- ═══════ LOGIN + 2FA (Zugangsschutz) ═══════ -->
   <Config
-    Name="Unban API-Token"
-    Target="UNBAN_API_TOKEN"
+    Name="Login aktivieren (AUTH_ENABLED)"
+    Target="AUTH_ENABLED"
+    Default="true"
+    Mode=""
+    Description="Schützt das gesamte Dashboard mit Benutzername + Passwort + 2FA (TOTP). Dringend empfohlen. Nur auf false setzen, wenn die Map in einem komplett isolierten LAN läuft."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">true</Config>
+
+  <Config
+    Name="Benutzername (ADMIN_USERNAME)"
+    Target="ADMIN_USERNAME"
+    Default="admin"
+    Mode=""
+    Description="Anmeldename für das Dashboard."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">admin</Config>
+
+  <Config
+    Name="Passwort (ADMIN_PASSWORD)"
+    Target="ADMIN_PASSWORD"
     Default=""
     Mode=""
-    Description="Empfohlen: Zufälliges Token (z.B. openssl rand -hex 32). Schützt den Unban-Endpunkt vor unbefugten Aufrufen. Leer lassen nur im isolierten LAN."
+    Description="Anmeldepasswort. Leer lassen = beim ersten Start wird ein Zufallspasswort erzeugt und EINMALIG ins Container-Log geschrieben (Logs ansehen!). Danach hier fest eintragen."
     Type="Variable"
     Display="always"
     Required="false"
     Mask="true"></Config>
+
+  <Config
+    Name="2FA-Secret (TOTP_SECRET)"
+    Target="TOTP_SECRET"
+    Default=""
+    Mode=""
+    Description="Base32-Secret für die Authenticator-App (Google Authenticator / SelfAuthenticator). Leer lassen = beim ersten Start wird ein Secret + QR-Link ins Log geschrieben. Diesen Wert dann hier eintragen, damit er Neustarts überlebt."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
+
+  <Config
+    Name="Session-Schlüssel (SESSION_SECRET)"
+    Target="SESSION_SECRET"
+    Default=""
+    Mode=""
+    Description="Signierschlüssel für Login-Sessions (z.B. openssl rand -hex 32). Wird einer nicht gesetzt, werden alle Logins bei jedem Neustart ungültig."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="true"></Config>
+
+  <Config
+    Name="Cookie nur über HTTPS (COOKIE_SECURE)"
+    Target="COOKIE_SECURE"
+    Default="false"
+    Mode=""
+    Description="Auf true setzen, wenn das Dashboard ausschließlich über HTTPS (Reverse-Proxy) erreichbar ist. Dann wird das Session-Cookie nur verschlüsselt übertragen."
+    Type="Variable"
+    Display="advanced"
+    Required="false"
+    Mask="false">false</Config>
 
   <Config
     Name="CrowdSec Restart Cooldown (Sekunden)"

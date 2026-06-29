@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>SelfThreatMap — Anmeldung</title>
+<style>
+  :root{
+    --bg:#020a12; --panel:rgba(6,18,28,0.92); --accent:#00e5c8;
+    --text:#cfeee6; --dim:rgba(0,229,200,0.30); --err:#ff5d6c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(0,229,200,0.12), transparent 60%),
+      var(--bg);
+    color:var(--text); font-family:'Share Tech Mono',ui-monospace,monospace;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:360px; background:var(--panel);
+    border:1px solid var(--dim); border-radius:14px; padding:30px 26px;
+    box-shadow:0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,229,200,0.05) inset;
+  }
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+  .brand .dot{width:11px; height:11px; border-radius:50%; background:var(--accent);
+    box-shadow:0 0 14px var(--accent); animation:pulse 2.2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+  h1{font-size:18px; letter-spacing:1px; margin:0; color:#eafff9;}
+  .sub{font-size:11px; color:rgba(160,255,216,0.5); margin:4px 0 22px; letter-spacing:.5px;}
+  label{display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--accent); opacity:.8; margin:14px 0 5px;}
+  input{
+    width:100%; padding:11px 12px; background:rgba(0,0,0,0.35);
+    border:1px solid var(--dim); border-radius:8px; color:var(--text);
+    font-family:inherit; font-size:14px; letter-spacing:.5px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,229,200,0.15);}
+  input[name=totp]{letter-spacing:6px; text-align:center; font-size:20px;}
+  button{
+    width:100%; margin-top:24px; padding:12px; border:none; border-radius:8px;
+    background:linear-gradient(135deg,#00e5c8,#00a98f); color:#021018;
+    font-family:inherit; font-size:14px; font-weight:700; letter-spacing:1.5px;
+    text-transform:uppercase; cursor:pointer; transition:transform .1s, filter .15s;
+  }
+  button:hover{filter:brightness(1.12);}
+  button:active{transform:translateY(1px);}
+  .err{
+    margin:16px 0 0; padding:9px 12px; border-radius:8px; font-size:12px;
+    background:rgba(255,93,108,0.12); border:1px solid rgba(255,93,108,0.4);
+    color:var(--err); text-align:center; display:none;
+  }
+  .err.show{display:block;}
+  .foot{margin-top:20px; font-size:10px; color:rgba(160,255,216,0.35);
+    text-align:center; letter-spacing:.5px;}
+</style>
+</head>
+<body>
+  <form class="card" method="POST" action="/auth/login" autocomplete="off">
+    <div class="brand"><span class="dot"></span><h1>SelfThreatMap</h1></div>
+    <p class="sub">Zugang nur fuer autorisierte Nutzer</p>
+
+    <div class="err" id="err">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</div>
+
+    <label for="u">Benutzername</label>
+    <input id="u" name="username" type="text" autocomplete="username" autofocus required>
+
+    <label for="p">Passwort</label>
+    <input id="p" name="password" type="password" autocomplete="current-password" required>
+
+    <label for="t">2FA-Code (Authenticator)</label>
+    <input id="t" name="totp" type="text" inputmode="numeric" pattern="[0-9]*"
+           maxlength="6" placeholder="000000" autocomplete="one-time-code" required>
+
+    <button type="submit">Anmelden</button>
+    <p class="foot">Geschuetzt durch Passwort + Zwei-Faktor-Authentifizierung</p>
+  </form>
+  <script>
+    if (new URLSearchParams(location.search).get('error')) {
+      var e = document.getElementById('err'); if (e) e.classList.add('show');
+      var rt = new URLSearchParams(location.search).get('retry');
+      if (rt) e.textContent = 'Zu viele Versuche. Bitte ' + rt + 's warten.';
+    }
+  </script>
+</body>
+</html>

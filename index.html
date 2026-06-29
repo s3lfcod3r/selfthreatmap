@@ -1241,8 +1241,7 @@
 const EXPORTER_URL = 'http://EURE-UNRAID-IP:9456/metrics';
 //  Wird beim Docker-Start automatisch durch entrypoint.sh ersetzt
 
-// Optional: API-Token für Unban (UNBAN_API_TOKEN in docker-compose) — wird beim Start eingetragen
-const UNBAN_API_TOKEN = 'UNBAN_TOKEN_PLACEHOLDER';
+// Unban-Autorisierung laeuft ueber die Login-Session (Cookie). Kein Token mehr im HTML.
 
 // 2. ⚠️ PFLICHT: Koordinaten eures Servers
 //    → Rechtsklick auf Google Maps → "Was ist hier?" → Zahlen kopieren
@@ -1496,7 +1495,7 @@ function updateFooterStats(){
 }
 function updateReplaySlider(){const sl=document.getElementById('replay-slider');if(!sl||replayWinEnd<=replayWinStart)return;sl.value=Math.round(1000*(replayCursor-replayWinStart)/(replayWinEnd-replayWinStart));document.getElementById('replay-clock').textContent=fmtReplayClock(replayCursor);document.getElementById('tl-start').textContent=fmtReplayClock(replayWinStart);document.getElementById('tl-end').textContent=fmtReplayClock(replayWinEnd);}
 function clearFlightLabels(){const layer=document.getElementById('flight-labels-layer');if(layer)layer.innerHTML='';}
-function escTag(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function escTag(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function flightTagText(r){
   const cc=(r.country||'??').toUpperCase();
   const cityRaw=r.city?translateCity(r.city):'';
@@ -3127,15 +3126,14 @@ async function unbanIPDirect(ip, btn){
 
   try{
     const base=EXPORTER_URL.replace(/\/metrics.*$/,'');
-    const headers={'Content-Type':'application/json'};
-    if(UNBAN_API_TOKEN&&UNBAN_API_TOKEN!=='UNBAN_TOKEN_PLACEHOLDER'){
-      headers['X-API-Token']=UNBAN_API_TOKEN;
-    }
+    // Autorisierung laeuft ueber die Login-Session (Cookie), kein Token im HTML.
     const res=await fetch(`${base}/unban`,{
       method:'POST',
-      headers,
+      headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
       body:JSON.stringify({ip}),
     });
+    if(res.status===401){ location.href='/auth/login'; return; }
     const data=await res.json();
     if(data.success){
       // Grüner Haken anzeigen
@@ -3200,17 +3198,17 @@ function tipBodyHTML(d,pinned){
   const foot=pinned?'':`<div style="color:rgba(0,229,200,0.25);font-size:8px;margin-top:5px;border-top:1px solid rgba(0,229,200,0.1);padding-top:4px;letter-spacing:1px;">${t('tip_click')}</div>`;
   return `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">
-      <span style="color:#f85149;font-size:12px;">${d.ip}</span>
-      <span style="color:rgba(255,34,68,0.5);font-size:10px;">${d.count||1}×</span>
+      <span style="color:#f85149;font-size:12px;">${escTag(d.ip)}</span>
+      <span style="color:rgba(255,34,68,0.5);font-size:10px;">${escTag(d.count||1)}×</span>
     </div>
-    ${subnetStr?`<div style="color:rgba(160,255,216,0.4);font-size:9px;margin-bottom:3px;">📡 ${subnetStr}</div>`:''}
+    ${subnetStr?`<div style="color:rgba(160,255,216,0.4);font-size:9px;margin-bottom:3px;">📡 ${escTag(subnetStr)}</div>`:''}
     <div style="margin-bottom:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-      <span style="color:#ff6a3d;font-size:10px;">${f} ${countryDisplayName(d.country)}</span>
-      ${cityStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(255,200,100,0.95);font-size:10px;">${cityStr}</span>`:''}
-      ${asnStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(0,229,200,0.5);font-size:9px;">${asnStr}</span>`:''}
+      <span style="color:#ff6a3d;font-size:10px;">${f} ${escTag(countryDisplayName(d.country))}</span>
+      ${cityStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(255,200,100,0.95);font-size:10px;">${escTag(cityStr)}</span>`:''}
+      ${asnStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(0,229,200,0.5);font-size:9px;">${escTag(asnStr)}</span>`:''}
     </div>
-    ${d.asname?`<div style="color:rgba(160,255,216,0.55);font-size:9px;margin-bottom:3px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${d.asname}</div>`:''}
-    <div style="color:rgba(160,255,216,0.6);font-size:9px;margin-bottom:${timeStr?'3px':'0'};">⚡ ${d.scenario}</div>
+    ${d.asname?`<div style="color:rgba(160,255,216,0.55);font-size:9px;margin-bottom:3px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escTag(d.asname)}</div>`:''}
+    <div style="color:rgba(160,255,216,0.6);font-size:9px;margin-bottom:${timeStr?'3px':'0'};">⚡ ${escTag(d.scenario)}</div>
     ${timeStr?`<div style="color:rgba(0,229,200,0.35);font-size:9px;">🕐 ${timeStr}</div>`:''}
     ${foot}`;
 }
@@ -3244,32 +3242,45 @@ function feedItemHTML(d){
   const cityStr=d.city&&d.city!=='-'?translateCity(d.city):'';
   return `<div class="feed-item" style="cursor:default;">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">
-      <div class="feed-ip" style="flex:1;">${d.ip}</div>
-      <button class="feed-action-btn feed-unban-btn" data-ip="${d.ip}"
-        onclick="event.stopPropagation();unbanIPDirect('${d.ip}',this);"
+      <div class="feed-ip" style="flex:1;">${escTag(d.ip)}</div>
+      <button class="feed-action-btn feed-unban-btn" data-act="unban" data-ip="${escTag(d.ip)}"
         title="${d.active_ban ? t('unban_active') : t('unban_history')}"
         style="font-size:16px;">${d.active_ban?'🚫':'📋'}</button>
-      <button class="feed-action-btn feed-lookup-btn"
-        onclick="event.stopPropagation();openCtxFeed('${d.ip}','${d.country}','${d.scenario}',1,event,'${d.iprange||''}');"
+      <button class="feed-action-btn feed-lookup-btn" data-act="lookup"
+        data-ip="${escTag(d.ip)}" data-country="${escTag(d.country)}" data-scenario="${escTag(d.scenario)}" data-iprange="${escTag(d.iprange||'')}"
         title="${t('lookup_title')}">🔍</button>
-      <button class="feed-action-btn feed-map-btn"
-        onclick="event.stopPropagation();jumpToPoint(${d.lat},${d.lon},'${d.ip}','${d.country}','${d.scenario}','${d.iprange||''}',event,'${(d.city||'').replace(/'/g,"\\'")}');"
+      <button class="feed-action-btn feed-map-btn" data-act="map"
+        data-lat="${escTag(d.lat)}" data-lon="${escTag(d.lon)}" data-ip="${escTag(d.ip)}" data-country="${escTag(d.country)}" data-scenario="${escTag(d.scenario)}" data-iprange="${escTag(d.iprange||'')}" data-city="${escTag(d.city||'')}"
         title="${t('map_title')}">↗</button>
     </div>
     <div style="font-size:clamp(7px,0.85vw,9px);color:rgba(160,255,216,0.35);margin-top:1px;">
-      ${subnetStr?`${t('subnet_icon')} ${subnetStr}`:''}
+      ${subnetStr?`${t('subnet_icon')} ${escTag(subnetStr)}`:''}
     </div>
     <div class="feed-meta" style="margin-top:2px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-      <span class="feed-country">${f} ${countryDisplayName(d.country)}</span>
-      ${cityStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(255,200,100,0.95);font-size:clamp(8px,0.95vw,10px);font-weight:500;">${cityStr}</span>`:''}
-      ${asnStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(0,229,200,0.45);font-size:clamp(7px,0.8vw,9px);">${asnStr}</span>`:''}
+      <span class="feed-country">${f} ${escTag(countryDisplayName(d.country))}</span>
+      ${cityStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(255,200,100,0.95);font-size:clamp(8px,0.95vw,10px);font-weight:500;">${escTag(cityStr)}</span>`:''}
+      ${asnStr?`<span style="color:rgba(0,229,200,0.2);">·</span><span style="color:rgba(0,229,200,0.45);font-size:clamp(7px,0.8vw,9px);">${escTag(asnStr)}</span>`:''}
     </div>
-    <div style="font-size:clamp(7px,0.85vw,9px);color:rgba(160,255,216,0.5);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.asname}">${d.asname||''}</div>
-    <div class="feed-scenario" style="margin-top:2px;cursor:pointer;" onclick="event.stopPropagation();filterByScenario('${d.scenario.replace(/'/g,"\\'")}');" title="${t('filter_scenario')}">${t('scenario_icon')} ${d.scenario}</div>
-    <div style="font-size:clamp(7px,0.8vw,9px);color:rgba(0,229,200,0.32);margin-top:3px;letter-spacing:0.5px;">${t('time_icon')} ${timeStr}</div>
+    <div style="font-size:clamp(7px,0.85vw,9px);color:rgba(160,255,216,0.5);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escTag(d.asname)}">${escTag(d.asname||'')}</div>
+    <div class="feed-scenario" data-act="filter-scenario" data-scenario="${escTag(d.scenario)}" style="margin-top:2px;cursor:pointer;" title="${t('filter_scenario')}">${t('scenario_icon')} ${escTag(d.scenario)}</div>
+    <div style="font-size:clamp(7px,0.8vw,9px);color:rgba(0,229,200,0.32);margin-top:3px;letter-spacing:0.5px;">${t('time_icon')} ${escTag(timeStr)}</div>
   </div>`;
 }
 function openCtxFeed(ip,country,scenario,count,ev,iprange){ev.stopPropagation();showCtx(ev,{ip,country,scenario,count,iprange});}
+
+// Zentrale Event-Delegation fuer Feed-Buttons — ersetzt Inline-onclick mit
+// interpolierten Backend-Daten (verhindert HTML-/JS-Injection ueber Szenario,
+// IP-Range, Stadt etc.). Werte kommen sicher aus data-Attributen.
+document.addEventListener('click',function(ev){
+  const el=ev.target.closest('[data-act]');
+  if(!el)return;
+  const a=el.dataset.act;
+  if(a==='unban'){ev.stopPropagation();unbanIPDirect(el.dataset.ip,el);}
+  else if(a==='lookup'){ev.stopPropagation();openCtxFeed(el.dataset.ip,el.dataset.country,el.dataset.scenario,1,ev,el.dataset.iprange||'');}
+  else if(a==='map'){ev.stopPropagation();jumpToPoint(parseFloat(el.dataset.lat),parseFloat(el.dataset.lon),el.dataset.ip,el.dataset.country,el.dataset.scenario,el.dataset.iprange||'',ev,el.dataset.city||'');}
+  else if(a==='filter-scenario'){ev.stopPropagation();filterByScenario(el.dataset.scenario);}
+  else if(a==='filter-country'){ev.stopPropagation();filterByCountry(el.dataset.country);}
+});
 
 // ── SELECTED DOT ──
 function clearSelection(){

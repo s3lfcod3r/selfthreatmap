@@ -28,13 +28,13 @@ function openOriginsOverview(){
 
   let html = `<div class="ov-summary"><b>${countries.length}</b> ${_ovT('Länder','countries')} · <b>${fmt(total)}</b> ${_ovT('Angriffe gesamt','attacks total')}</div>`;
   html += '<div class="ov-list">' + countries.map((c,i)=>
-    `<div class="ov-row"><span class="ov-rank">${i+1}</span><span class="ov-flag">${flag(c.cc)}</span><span class="ov-name">${cname(c.cc)}</span><span class="ov-bar"><span style="width:${Math.max(3,Math.round(c.n/cmax*100))}%"></span></span><span class="ov-count">${fmt(c.n)}</span></div>`
+    `<div class="ov-row"><span class="ov-rank">${i+1}</span><span class="ov-flag">${flag(c.cc)}</span><span class="ov-name">${escTag(cname(c.cc))}</span><span class="ov-bar"><span style="width:${Math.max(3,Math.round(c.n/cmax*100))}%"></span></span><span class="ov-count">${fmt(c.n)}</span></div>`
   ).join('') + '</div>';
 
   if(cities.length){
     const ctmax = cities[0].n;
     html += `<div class="ov-sub">${_ovT('Top-Städte','Top cities')}</div><div class="ov-list">` + cities.map((c,i)=>
-      `<div class="ov-row"><span class="ov-rank">${i+1}</span><span class="ov-flag">${flag(c.cc)}</span><span class="ov-name">${typeof translateCity==='function'?translateCity(c.city):c.city}</span><span class="ov-bar"><span style="width:${Math.max(3,Math.round(c.n/ctmax*100))}%"></span></span><span class="ov-count">${fmt(c.n)}</span></div>`
+      `<div class="ov-row"><span class="ov-rank">${i+1}</span><span class="ov-flag">${flag(c.cc)}</span><span class="ov-name">${escTag(typeof translateCity==='function'?translateCity(c.city):c.city)}</span><span class="ov-bar"><span style="width:${Math.max(3,Math.round(c.n/ctmax*100))}%"></span></span><span class="ov-count">${fmt(c.n)}</span></div>`
     ).join('') + '</div>';
   }
 

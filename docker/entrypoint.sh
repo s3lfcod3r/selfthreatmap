@@ -2,13 +2,13 @@
 set -e
 
 # ============================================================
-# CrowdSec Threat Map — Container Entrypoint v1.5.0
+# CrowdSec Threat Map — Container Entrypoint v2.8.0
 # ============================================================
 
 log() { echo "[$(date '+%F %T')] $*"; }
 
 log "🛡️  CrowdSec Threat Map startet..."
-log "   Version: v1.5.0"
+log "   Version: v2.8.0"
 
 # ── Pflichtprüfungen ──
 if [ -z "$SERVER_LAT" ] || [ "$SERVER_LAT" = "0.0" ]; then
@@ -58,9 +58,32 @@ export WHITELIST_FILE="${WHITELIST_FILE:-/crowdsec/postoverflows/s01-whitelist/m
 export WHITELIST_INTERVAL="${WHITELIST_INTERVAL:-900}"
 export CROWDSEC_RESTART_WAIT="${CROWDSEC_RESTART_WAIT:-15}"
 export CROWDSEC_RESTART_COOLDOWN="${CROWDSEC_RESTART_COOLDOWN:-300}"
-export UNBAN_API_TOKEN="${UNBAN_API_TOKEN:-}"
+
+# ── Login + 2FA (Auth) ──
+export AUTH_ENABLED="${AUTH_ENABLED:-true}"
+export ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+export ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
+export ADMIN_PASSWORD_HASH="${ADMIN_PASSWORD_HASH:-}"
+export TOTP_SECRET="${TOTP_SECRET:-}"
+export SESSION_SECRET="${SESSION_SECRET:-}"
+export SESSION_TTL="${SESSION_TTL:-86400}"
+export COOKIE_SECURE="${COOKIE_SECURE:-false}"
+export LOGIN_MAX_FAILS="${LOGIN_MAX_FAILS:-5}"
+export LOGIN_LOCKOUT_SECONDS="${LOGIN_LOCKOUT_SECONDS:-900}"
+# Exporter bindet nur lokal; nginx proxied nach aussen
+export LISTEN_HOST="${LISTEN_HOST:-127.0.0.1}"
 
 export LANGUAGE="${LANGUAGE:-de}"
+
+# ── SERVER_NAME absichern (wird per sed in index.html injiziert) ──
+# Nur unkritische Zeichen erlauben, sonst koennte ein Wert wie ';alert(1)//
+# in den JS-Code der Seite gelangen.
+SAFE_SERVER_NAME=$(printf '%s' "$SERVER_NAME" | tr -cd 'A-Za-z0-9 ._-' | cut -c1-40)
+if [ "$SAFE_SERVER_NAME" != "$SERVER_NAME" ]; then
+    log "⚠️  SERVER_NAME bereinigt: '${SERVER_NAME}' → '${SAFE_SERVER_NAME}'"
+fi
+SERVER_NAME="$SAFE_SERVER_NAME"
+export SERVER_NAME
 
 # ── index.html mit korrekter Exporter-URL patchen ──
 log "🔧 Dashboard konfigurieren..."
@@ -94,15 +117,6 @@ sed -i "s|'LANGUAGE_PLACEHOLDER'|'${LANG_VAL}'|g" \
     /var/www/html/index.html 2>/dev/null || true
 log "🌐 Sprache: ${LANG_VAL}"
 
-# Unban-API-Token ins Dashboard (leer = kein Token nötig)
-if [ -n "$UNBAN_API_TOKEN" ]; then
-    sed -i "s|UNBAN_TOKEN_PLACEHOLDER|${UNBAN_API_TOKEN}|g" \
-        /var/www/html/index.html 2>/dev/null || true
-    log "🔐 Unban-API-Token: gesetzt"
-else
-    log "⚠️  Unban-API-Token: nicht gesetzt — Unban nur im vertrauenswürdigen LAN nutzen"
-fi
-
 log "✅ Dashboard konfiguriert (Exporter-URL: ${METRICS_URL})"
 
 # ── Nginx starten ──
@@ -116,8 +130,12 @@ python3 /app/crowdsec_exporter.py &
 EXPORTER_PID=$!
 
 log "✅ Alles läuft!"
-log "   Dashboard: http://<EURE-IP>:8080"
-log "   API direkt: http://<EURE-IP>:9456/metrics (optional)"
+log "   Dashboard: http://<EURE-IP>:8080  (Login erforderlich)"
+if [ "${AUTH_ENABLED:-true}" = "true" ]; then
+    log "   🔐 Login + 2FA aktiv — Zugangsdaten ggf. im Exporter-Log oben"
+else
+    log "   ⚠️  AUTH_ENABLED=false — Dashboard ist OHNE Login erreichbar!"
+fi
 
 # ── Warten und bei Absturz neu starten ──
 while true; do

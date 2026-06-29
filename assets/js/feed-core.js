@@ -74,7 +74,8 @@ function parseFeedData(text){
 
 async function fetchAndRender(){
   try{
-    const res=await fetch(EXPORTER_URL,{cache:'no-store'});
+    const res=await fetch(EXPORTER_URL,{cache:'no-store',credentials:'same-origin'});
+    if(res.status===401){ location.href='/auth/login'; return; }
     const text=await res.text();
     lastMetricsText=text;
     allEvents=parseFeedData(text).filter(d=>!localUnbanned.has(d.ip)&&d.ts>0);

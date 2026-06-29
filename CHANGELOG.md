@@ -2,6 +2,24 @@
 
 ---
 
+## v2.8.0 — 29.06.2026
+
+### 🔐 Login + Zwei-Faktor (2FA) — Dashboard-Zugangsschutz
+- Das **gesamte Dashboard** ist jetzt durch **Benutzername + Passwort + TOTP-2FA** geschützt (`AUTH_ENABLED=true` als Standard). Umsetzung mit nginx `auth_request` vor allen Seiten/Endpunkten + signierter Session-Cookie (HttpOnly/SameSite=Strict). Reine Python-stdlib, kein zusätzlicher Dienst nötig. Neue Dateien: [`auth.py`](auth.py), [`login.html`](login.html).
+- Beim **ersten Start** werden Zufallspasswort + 2FA-Secret (inkl. `otpauth://`-Link) **einmalig ins Container-Log** geschrieben — danach in `ADMIN_PASSWORD` / `TOTP_SECRET` / `SESSION_SECRET` festsetzen.
+- **Brute-Force-Schutz**: Login-Rate-Limit (nginx) + IP-Lockout nach 5 Fehlversuchen (15 min).
+
+### 🛡️ Security-Härtung (Audit-Befunde behoben)
+- **Unban fail-closed**: ohne gültige Login-Session **kein** Unban mehr (vorher: ohne Token offen für jeden im Netz).
+- **Exporter bindet nur noch lokal** (`127.0.0.1` statt `0.0.0.0`) — andere Container erreichen die API nicht mehr direkt.
+- **XSS behoben**: alle Backend-Felder (IP, Szenario, ASN, Stadt, IP-Range) werden in Feed/Tooltip/Panels/Herkünfte konsequent escaped; Inline-`onclick` mit interpolierten Daten durch sichere `data`-Attribute + zentrale Event-Delegation ersetzt.
+- **CORS** `*` von allen API-Endpunkten entfernt (Same-Origin über nginx-Proxy).
+- **CSP**-Header + `Permissions-Policy` + `X-Frame-Options: DENY` ergänzt; Rate-Limit auf `/unban`.
+- **Kein Token mehr im HTML** (Unban läuft über die Session), generische Fehlermeldungen statt Stacktraces/DB-Pfaden, `SERVER_NAME` wird vor dem Einsetzen bereinigt.
+- Docker-Socket-Risiko im Compose/Template klar dokumentiert (Socket-Proxy als Härtung empfohlen).
+
+---
+
 ## v2.7.2 — 28.06.2026
 
 ### 🎨 Herkünfte-Punkte farbig

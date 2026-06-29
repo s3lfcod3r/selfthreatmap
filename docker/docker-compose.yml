@@ -17,6 +17,12 @@ services:
       - /EUER-PFAD/postoverflows:/crowdsec/postoverflows
 
       # Für IP-Unban: Docker-Socket einbinden
+      # ⚠️  SICHERHEITSHINWEIS: Der Docker-Socket gibt faktisch Root-Rechte auf
+      #     dem Host. Das ":ro" verhindert das NICHT (Socket ≠ Datei). Nur
+      #     einbinden, wenn Unban/Whitelist-Restart wirklich gebraucht werden.
+      #     Härter: tecnativa/docker-socket-proxy mit nur den nötigen Rechten
+      #     vorschalten (EXEC für cscli), statt den vollen Socket zu mounten.
+      #     Wer Unban nicht braucht: diese Zeile entfernen.
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
       # OPTIONAL: Live-Firewall-Drops — Verzeichnis mit drops.jsonl einbinden
@@ -49,9 +55,26 @@ services:
       - CROWDSEC_RESTART_WAIT=15
       - CROWDSEC_RESTART_COOLDOWN=300     # Mindestabstand zwischen CrowdSec-Neustarts (Sekunden)
 
-      # Sicherheit: Zufälliges Token setzen (z.B. openssl rand -hex 32)
-      # Schützt /unban vor unbefugten Aufrufen und CSRF aus dem Browser
-      # - UNBAN_API_TOKEN=dein-geheimes-token-hier
+      # ──────────────────────────────────────────────
+      # 🔐 LOGIN + 2FA (Zwei-Faktor) — schützt das ganze Dashboard
+      # ──────────────────────────────────────────────
+      # Standardmäßig AKTIV. Beim ersten Start werden Passwort + 2FA-Secret
+      # generiert und EINMALIG ins Container-Log geschrieben:
+      #   docker logs selfthreatmap   → dort Passwort + TOTP-Secret ablesen
+      # Danach hier fest setzen, damit sie Neustarts überleben:
+      - AUTH_ENABLED=true
+      - ADMIN_USERNAME=admin
+      # Passwort im Klartext (wird intern gehasht) ODER ADMIN_PASSWORD_HASH nutzen:
+      # - ADMIN_PASSWORD=dein-sicheres-passwort
+      # 2FA-Secret (Base32) — aus dem Log übernehmen und hier eintragen:
+      # - TOTP_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      # Session-Signierschlüssel (sonst gehen Logins bei Neustart verloren):
+      #   openssl rand -hex 32
+      # - SESSION_SECRET=dein-zufaelliger-hex-key
+      # Wenn die Map nur über HTTPS (Reverse-Proxy) erreichbar ist:
+      # - COOKIE_SECURE=true
+      # Zugang komplett ohne Login (NUR vertrauenswürdiges LAN!):
+      # - AUTH_ENABLED=false
 
       # OPTIONAL: Live-Firewall-Drops (/drops-API). Standard: aus.
       # Braucht eine gemountete JSONL-Datei (eine Zeile = ein verworfenes Paket).

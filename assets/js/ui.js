@@ -18,7 +18,7 @@ function renderMapPanels(){
     byIp[e.ip]=(byIp[e.ip]||0)+1;
     byCo[e.country]=(byCo[e.country]||0)+1;
   });
-  const row=(c,l,v)=>`<div class="map-panel-row"><span class="map-panel-dot" style="background:${c}"></span><span class="map-panel-label">${l}</span><span class="map-panel-val">${v}</span></div>`;
+  const row=(c,l,v)=>`<div class="map-panel-row"><span class="map-panel-dot" style="background:${escTag(c)}"></span><span class="map-panel-label">${escTag(l)}</span><span class="map-panel-val">${escTag(v)}</span></div>`;
   document.getElementById('panel-scenarios-body').innerHTML=Object.entries(bySc).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([s,n])=>row(scenarioColor(s),s,n)).join('')||'—';
   document.getElementById('panel-ips-body').innerHTML=Object.entries(byIp).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([ip,n])=>{
     const c=events.find(e=>e.ip===ip)?.country||'??';
@@ -32,9 +32,9 @@ function renderFilterBar(){
   const bar=document.getElementById('filter-bar');
   const mobBar=document.getElementById('mob-filter-bar');
   let html='';
-  if(activeFilters.country) html+=`<div class="filter-chip" onclick="clearFilter('country')"><span>🌍 ${countryDisplayName(activeFilters.country)}</span><span class="filter-chip-x">✕</span></div>`;
-  if(activeFilters.scenario) html+=`<div class="filter-chip" onclick="clearFilter('scenario')"><span>⚡ ${activeFilters.scenario}</span><span class="filter-chip-x">✕</span></div>`;
-  if(activeFilters.search) html+=`<div class="filter-chip" onclick="document.getElementById('feed-search').value='';document.getElementById('mob-feed-search')&&(document.getElementById('mob-feed-search').value='');onFeedSearch();"><span>🔍 ${activeFilters.search}</span><span class="filter-chip-x">✕</span></div>`;
+  if(activeFilters.country) html+=`<div class="filter-chip" onclick="clearFilter('country')"><span>🌍 ${escTag(countryDisplayName(activeFilters.country))}</span><span class="filter-chip-x">✕</span></div>`;
+  if(activeFilters.scenario) html+=`<div class="filter-chip" onclick="clearFilter('scenario')"><span>⚡ ${escTag(activeFilters.scenario)}</span><span class="filter-chip-x">✕</span></div>`;
+  if(activeFilters.search) html+=`<div class="filter-chip" onclick="document.getElementById('feed-search').value='';document.getElementById('mob-feed-search')&&(document.getElementById('mob-feed-search').value='');onFeedSearch();"><span>🔍 ${escTag(activeFilters.search)}</span><span class="filter-chip-x">✕</span></div>`;
   if(bar)bar.innerHTML=html;
   if(mobBar){mobBar.innerHTML=html;mobBar.style.display=html?'flex':'none';}
 }
@@ -123,13 +123,13 @@ function countryListHTML(items){
     const f=FLAG[d.country]||'🌐',pct=Math.round(d.count/max*100),col=countColor(d.count);
     const isActive=activeFilters.country===d.country;
     const cName=countryDisplayName(d.country);
-    return `<div class="top-item${isActive?' top-item-active':''}" onclick="filterByCountry('${d.country}')" title="${t('filter_country',cName)}">
+    return `<div class="top-item${isActive?' top-item-active':''}" data-act="filter-country" data-country="${escTag(d.country)}" title="${escTag(t('filter_country',cName))}">
       <div class="top-rank">#${i+1}</div><div class="top-flag">${f}</div>
       <div class="top-info">
-        <div class="top-country" style="${isActive?'color:var(--accent);':''}">${cName}</div>
+        <div class="top-country" style="${isActive?'color:var(--accent);':''}">${escTag(cName)}</div>
         <div class="top-bar-wrap"><div class="top-bar" style="width:${pct}%;background:${col}"></div></div>
       </div>
-      <div class="top-count">${d.count}</div>
+      <div class="top-count">${escTag(d.count)}</div>
     </div>`;
   }).join('');
 }
