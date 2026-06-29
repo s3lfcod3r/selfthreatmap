@@ -100,7 +100,7 @@ The signature feature: how each attack travels from its origin to your server. P
 
 ## 🔒 Security
 
-On first visit you set up an admin account in the browser (no secrets in env vars). **2FA is optional** and managed under Settings. The account lives in the `/config` volume, so it survives container updates.
+On first visit you set up an admin account in the browser (no secrets in env vars). **2FA is optional** and managed under Settings. The account lives in the `/config` volume, so it survives container updates. The login, setup and settings screens are available in all **12 EU languages** (language switcher top-right, shared with the dashboard).
 
 The dashboard can lift CrowdSec bans via the Docker socket, so treat port **8080 like an admin UI**: keep it on LAN/VPN, and put it behind HTTPS (set `COOKIE_SECURE=true`) if reachable from outside. Login brute-force is rate-limited and locks out after repeated failures.
 
@@ -139,7 +139,7 @@ Das Herzstück: wie jeder Angriff von der Quelle zu deinem Server fliegt. **Übe
 
 ### 🔒 Sicherheit
 
-Beim **ersten Aufruf** legst du im Browser ein Admin-Konto an (Benutzer + Passwort) — keine Geheimnisse mehr in Umgebungsvariablen. **2FA ist optional** und wird danach in den **Einstellungen** per QR-Code aktiviert (Authenticator-App: Google Authenticator / SelfAuthenticator). Das Konto liegt im **`/config`-Volume** und übersteht so Container-Updates — dieses Volume **muss gemountet** sein.
+Beim **ersten Aufruf** legst du im Browser ein Admin-Konto an (Benutzer + Passwort) — keine Geheimnisse mehr in Umgebungsvariablen. **2FA ist optional** und wird danach in den **Einstellungen** per QR-Code aktiviert (Authenticator-App: Google Authenticator / SelfAuthenticator). Das Konto liegt im **`/config`-Volume** und übersteht so Container-Updates — dieses Volume **muss gemountet** sein. Login-, Einrichtungs- und Einstellungsseite gibt es in allen **12 EU-Sprachen** (Sprachwähler oben rechts, wird mit dem Dashboard geteilt).
 
 Das Dashboard kann über den Docker-Socket CrowdSec-Bans aufheben — behandle Port **8080 wie eine Admin-Oberfläche**: nur im LAN/VPN nutzen und bei externer Erreichbarkeit hinter HTTPS legen (`COOKIE_SECURE=true`). Fehl-Logins sind rate-limitiert und werden nach mehreren Versuchen gesperrt.
 

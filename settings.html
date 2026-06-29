@@ -61,70 +61,80 @@
   .secret{margin-top:10px; font-size:12px; letter-spacing:1px; word-break:break-all; color:rgba(255,200,100,0.95);}
   .steps{font-size:11px; color:rgba(160,255,216,0.5); line-height:1.6; margin:8px 0 0; text-align:left;}
   .hidden{display:none;}
+  #auth-lang{margin-left:10px;}
+  #auth-lang select{background:rgba(2,10,18,0.9); color:var(--text);
+    border:1px solid var(--dim); border-radius:8px; font-family:inherit;
+    font-size:12px; padding:6px 8px; cursor:pointer; outline:none;}
+  #auth-lang select:focus{border-color:var(--accent);}
+  .topbar-right{display:flex; align-items:center;}
 </style>
+<script src="/assets/i18n/auth-i18n.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
       <div class="brand">
         <img class="brand-shield" src="/assets/logo/shield.png" alt="SelfThreatMap">
-        <span class="wordmark">Self<span>ThreatMap</span><small>EINSTELLUNGEN</small></span>
+        <span class="wordmark">Self<span>ThreatMap</span><small data-i18n="settings_sub">EINSTELLUNGEN</small></span>
       </div>
-      <a class="back" href="/">← Zur Karte</a>
+      <div class="topbar-right">
+        <a class="back" href="/" data-i18n="settings_back">← Zur Karte</a>
+        <div id="auth-lang"></div>
+      </div>
     </div>
 
     <!-- Konto -->
     <div class="card">
-      <h2>Konto</h2>
+      <h2 data-i18n="acc_title">Konto</h2>
       <div class="meta">
-        Benutzer: <b id="acc-user">…</b><br>
-        Zwei-Faktor (2FA): <span id="acc-2fa" class="badge off">…</span>
+        <span data-i18n="acc_user">Benutzer:</span> <b id="acc-user">…</b><br>
+        <span data-i18n="acc_2fa">Zwei-Faktor (2FA):</span> <span id="acc-2fa" class="badge off">…</span>
       </div>
     </div>
 
     <!-- Passwort -->
     <div class="card">
-      <h2>Passwort ändern</h2>
-      <label for="cur">Aktuelles Passwort</label>
+      <h2 data-i18n="pw_title">Passwort ändern</h2>
+      <label for="cur" data-i18n="pw_current">Aktuelles Passwort</label>
       <input id="cur" type="password" autocomplete="current-password">
-      <label for="new1">Neues Passwort</label>
+      <label for="new1" data-i18n="pw_new">Neues Passwort</label>
       <input id="new1" type="password" autocomplete="new-password">
-      <label for="new2">Neues Passwort wiederholen</label>
+      <label for="new2" data-i18n="pw_new2">Neues Passwort wiederholen</label>
       <input id="new2" type="password" autocomplete="new-password">
-      <button id="btn-pw">Passwort speichern</button>
+      <button id="btn-pw" data-i18n="pw_save">Passwort speichern</button>
       <div class="msg" id="pw-msg"></div>
     </div>
 
     <!-- 2FA -->
     <div class="card">
-      <h2>Zwei-Faktor-Authentifizierung</h2>
+      <h2 data-i18n="twofa_title">Zwei-Faktor-Authentifizierung</h2>
 
       <!-- Wenn AUS -->
       <div id="twofa-off">
-        <p class="meta">Schütze dein Konto zusätzlich mit einem Einmal-Code aus einer
+        <p class="meta" data-i18n="twofa_intro">Schütze dein Konto zusätzlich mit einem Einmal-Code aus einer
           Authenticator-App (Google Authenticator, SelfAuthenticator …).</p>
-        <button id="btn-2fa-start">2FA einrichten</button>
+        <button id="btn-2fa-start" data-i18n="twofa_setup">2FA einrichten</button>
 
         <div class="qr-area" id="qr-area">
           <div id="qr"></div>
           <div class="secret" id="secret-text"></div>
           <p class="steps">
-            1. App öffnen → Konto hinzufügen → QR-Code scannen (oder Schlüssel manuell eintippen).<br>
-            2. Den angezeigten 6-stelligen Code unten eingeben und bestätigen.
+            <span data-i18n="twofa_step1">1. App öffnen → Konto hinzufügen → QR-Code scannen (oder Schlüssel manuell eintippen).</span><br>
+            <span data-i18n="twofa_step2">2. Den angezeigten 6-stelligen Code unten eingeben und bestätigen.</span>
           </p>
-          <label for="enable-code">Code aus der App</label>
+          <label for="enable-code" data-i18n="twofa_code">Code aus der App</label>
           <input id="enable-code" inputmode="numeric" maxlength="6" placeholder="000000"
                  style="letter-spacing:6px;text-align:center;">
-          <button id="btn-2fa-enable">Aktivieren</button>
+          <button id="btn-2fa-enable" data-i18n="twofa_activate">Aktivieren</button>
         </div>
       </div>
 
       <!-- Wenn AN -->
       <div id="twofa-on" class="hidden">
-        <p class="meta">2FA ist <b style="color:var(--ok)">aktiv</b>. Zum Deaktivieren bitte dein Passwort eingeben.</p>
-        <label for="dis-pw">Passwort</label>
+        <p class="meta" data-i18n="twofa_on">2FA ist aktiv. Zum Deaktivieren bitte dein Passwort eingeben.</p>
+        <label for="dis-pw" data-i18n="pass">Passwort</label>
         <input id="dis-pw" type="password" autocomplete="current-password">
-        <button id="btn-2fa-disable" class="danger">2FA deaktivieren</button>
+        <button id="btn-2fa-disable" class="danger" data-i18n="twofa_disable">2FA deaktivieren</button>
       </div>
 
       <div class="msg" id="twofa-msg"></div>
@@ -133,9 +143,17 @@
 
   <script src="/assets/vendor/qrcode.min.js"></script>
   <script>
+    window.AUTH_PAGE = 'settings';
     const $ = id => document.getElementById(id);
     let pendingSecret = null;
+    let lastTotp = null;
 
+    const tt = k => (window.authT ? authT(k) : k);
+    function errText(code){
+      if (!code) return tt('err_generic');
+      const v = tt('err_' + code);
+      return v === 'err_' + code ? tt('err_generic') : v;
+    }
     function show(el, kind, text){ el.className = 'msg ' + kind; el.textContent = text; }
 
     async function api(path, body){
@@ -143,41 +161,47 @@
         method:'POST', headers:{'Content-Type':'application/json'},
         credentials:'same-origin', body: JSON.stringify(body||{})
       });
-      if (res.status === 401){ location.href = '/auth/login'; return {ok:false,message:'Sitzung abgelaufen'}; }
+      if (res.status === 401){ location.href = '/auth/login'; return {ok:false, code:'session'}; }
       return res.json();
     }
+
+    function renderBadge(){
+      const b = $('acc-2fa'); if (!b || lastTotp === null) return;
+      b.className = 'badge ' + (lastTotp ? 'on' : 'off');
+      b.textContent = lastTotp ? tt('badge_on') : tt('badge_off');
+    }
+    window.onAuthI18n = renderBadge;  // bei Sprachwechsel Badge neu setzen
 
     async function loadStatus(){
       const res = await fetch('/auth/status', {credentials:'same-origin', cache:'no-store'});
       const s = await res.json();
       $('acc-user').textContent = s.username || '—';
-      const b = $('acc-2fa');
-      if (s.totp_enabled){ b.className='badge on'; b.textContent='aktiv';
-        $('twofa-off').classList.add('hidden'); $('twofa-on').classList.remove('hidden'); }
-      else { b.className='badge off'; b.textContent='inaktiv';
-        $('twofa-off').classList.remove('hidden'); $('twofa-on').classList.add('hidden'); }
+      lastTotp = !!s.totp_enabled;
+      renderBadge();
+      if (lastTotp){ $('twofa-off').classList.add('hidden'); $('twofa-on').classList.remove('hidden'); }
+      else { $('twofa-off').classList.remove('hidden'); $('twofa-on').classList.add('hidden'); }
     }
 
     // Passwort ändern
     $('btn-pw').addEventListener('click', async ()=>{
       const cur=$('cur').value, n1=$('new1').value, n2=$('new2').value;
-      if (n1 !== n2){ show($('pw-msg'),'err','Die neuen Passwörter stimmen nicht überein.'); return; }
-      if (n1.length < 8){ show($('pw-msg'),'err','Neues Passwort: mindestens 8 Zeichen.'); return; }
+      if (n1 !== n2){ show($('pw-msg'),'err',tt('msg_pw_mismatch')); return; }
+      if (n1.length < 8){ show($('pw-msg'),'err',tt('msg_pw_short')); return; }
       const r = await api('/auth/password', {current:cur, new:n1});
-      show($('pw-msg'), r.ok?'ok':'err', r.ok?'Passwort geändert.':(r.message||'Fehler'));
+      show($('pw-msg'), r.ok?'ok':'err', r.ok?tt('msg_pw_ok'):errText(r.code));
       if (r.ok){ $('cur').value=$('new1').value=$('new2').value=''; }
     });
 
     // 2FA einrichten — Secret + QR holen
     $('btn-2fa-start').addEventListener('click', async ()=>{
       const r = await api('/auth/2fa/init', {});
-      if (!r.ok){ show($('twofa-msg'),'err', r.message||'Fehler'); return; }
+      if (!r.ok){ show($('twofa-msg'),'err', errText(r.code)); return; }
       pendingSecret = r.secret;
       $('qr').innerHTML = '';
       try {
         const qr = qrcode(0, 'M'); qr.addData(r.otpauth_url); qr.make();
         $('qr').innerHTML = qr.createImgTag(5, 8);
-      } catch(e){ $('qr').textContent = '(QR-Code konnte nicht erzeugt werden — Schlüssel manuell eintippen)'; }
+      } catch(e){ $('qr').textContent = tt('msg_qr_err'); }
       $('secret-text').textContent = r.secret;
       $('qr-area').classList.add('show');
     });
@@ -186,15 +210,15 @@
     $('btn-2fa-enable').addEventListener('click', async ()=>{
       const code = $('enable-code').value.trim();
       const r = await api('/auth/2fa/enable', {secret:pendingSecret, code});
-      if (r.ok){ show($('twofa-msg'),'ok','2FA wurde aktiviert.'); $('qr-area').classList.remove('show'); await loadStatus(); }
-      else show($('twofa-msg'),'err', r.message||'Fehler');
+      if (r.ok){ show($('twofa-msg'),'ok',tt('msg_2fa_on')); $('qr-area').classList.remove('show'); await loadStatus(); }
+      else show($('twofa-msg'),'err', errText(r.code));
     });
 
     // 2FA deaktivieren
     $('btn-2fa-disable').addEventListener('click', async ()=>{
       const r = await api('/auth/2fa/disable', {password:$('dis-pw').value});
-      if (r.ok){ show($('twofa-msg'),'ok','2FA wurde deaktiviert.'); $('dis-pw').value=''; await loadStatus(); }
-      else show($('twofa-msg'),'err', r.message||'Fehler');
+      if (r.ok){ show($('twofa-msg'),'ok',tt('msg_2fa_off')); $('dis-pw').value=''; await loadStatus(); }
+      else show($('twofa-msg'),'err', errText(r.code));
     });
 
     loadStatus();

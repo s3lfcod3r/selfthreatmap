@@ -58,47 +58,69 @@
   .err.show{display:block;}
   .foot{margin-top:20px; font-size:10px; color:rgba(160,255,216,0.35);
     text-align:center; letter-spacing:.5px;}
+  #auth-lang{position:fixed; top:14px; right:16px; z-index:10;}
+  #auth-lang select{background:rgba(2,10,18,0.9); color:var(--text);
+    border:1px solid var(--dim); border-radius:8px; font-family:inherit;
+    font-size:12px; padding:6px 8px; cursor:pointer; outline:none;}
+  #auth-lang select:focus{border-color:var(--accent);}
 </style>
+<script src="/assets/i18n/auth-i18n.js"></script>
 </head>
 <body>
+  <div id="auth-lang"></div>
   <form class="card" method="POST" action="/auth/login" autocomplete="off">
     <div class="brand">
       <img class="brand-shield" src="/assets/logo/shield.png" alt="SelfThreatMap">
       <span class="wordmark">Self<span>ThreatMap</span></span>
     </div>
-    <p class="sub">Zugang nur für autorisierte Nutzer</p>
+    <p class="sub" data-i18n="login_sub">Zugang nur für autorisierte Nutzer</p>
 
-    <div class="err" id="err">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</div>
+    <div class="err" id="err"></div>
 
-    <label for="u">Benutzername</label>
+    <label for="u" data-i18n="user">Benutzername</label>
     <input id="u" name="username" type="text" autocomplete="username" autofocus required>
 
-    <label for="p">Passwort</label>
+    <label for="p" data-i18n="pass">Passwort</label>
     <input id="p" name="password" type="password" autocomplete="current-password" required>
 
     <div id="totp-wrap" style="display:none;">
-      <label for="t">2FA-Code (Authenticator)</label>
+      <label for="t" data-i18n="login_2fa">2FA-Code (Authenticator)</label>
       <input id="t" name="totp" type="text" inputmode="numeric" pattern="[0-9]*"
              maxlength="6" placeholder="000000" autocomplete="one-time-code">
     </div>
 
-    <button type="submit">Anmelden</button>
-    <p class="foot" id="foot">Geschützt durch Passwort</p>
+    <button type="submit" data-i18n="login_btn">Anmelden</button>
+    <p class="foot" id="foot"></p>
   </form>
   <script>
-    if (new URLSearchParams(location.search).get('error')) {
-      var e = document.getElementById('err'); if (e) e.classList.add('show');
-      var rt = new URLSearchParams(location.search).get('retry');
-      if (rt) e.textContent = 'Zu viele Versuche. Bitte ' + rt + 's warten.';
-    }
+    window.AUTH_PAGE = 'login';
+    var has2fa = false;
+    var q = new URLSearchParams(location.search);
+    var errMode = q.get('error') ? (q.get('retry') ? 'retry' : 'login') : '';
+    var retryN = q.get('retry') || '';
+
+    // Dynamische Texte bei jedem Sprachwechsel neu setzen
+    window.onAuthI18n = function () {
+      var foot = document.getElementById('foot');
+      if (foot) foot.textContent = has2fa ? authT('login_foot_2fa') : authT('login_foot_pw');
+      var e = document.getElementById('err');
+      if (e && errMode) {
+        e.classList.add('show');
+        e.textContent = errMode === 'retry'
+          ? authT('login_retry').replace('{n}', retryN)
+          : authT('login_err');
+      }
+    };
+
     // Erststart -> Setup; 2FA-Feld nur zeigen wenn aktiviert
-    fetch('/auth/status', {cache:'no-store'}).then(r=>r.json()).then(s=>{
+    fetch('/auth/status', {cache:'no-store'}).then(function(r){return r.json();}).then(function(s){
       if (!s.setup_done) { location.href = '/auth/setup'; return; }
       if (s.totp_enabled) {
+        has2fa = true;
         document.getElementById('totp-wrap').style.display = '';
         document.getElementById('t').setAttribute('required','');
-        document.getElementById('foot').textContent = 'Geschützt durch Passwort + Zwei-Faktor (2FA)';
       }
+      if (window.onAuthI18n) window.onAuthI18n();
     }).catch(function(){});
   </script>
 </body>

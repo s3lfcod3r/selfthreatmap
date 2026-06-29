@@ -168,15 +168,15 @@ def validate_username(name):
 
 
 def create_account(username, password):
-    """Legt das erste Konto an. Gibt (ok, fehlermeldung) zurueck."""
+    """Legt das erste Konto an. Gibt (ok, code) zurueck — code = i18n-Schluessel."""
     with _store_lock:
         if is_setup_done():
-            return False, "Konto existiert bereits"
+            return False, "account_exists"
         uname = validate_username(username)
         if not uname:
-            return False, "Ungültiger Benutzername (1–32 Zeichen: a–z, 0–9, . _ -)"
+            return False, "username_invalid"
         if len(password or "") < PASSWORD_MINLEN:
-            return False, f"Passwort zu kurz (mindestens {PASSWORD_MINLEN} Zeichen)"
+            return False, "password_short"
         store = {
             "version": 1,
             "username": uname,
@@ -207,9 +207,9 @@ def change_password(current, new):
     with _store_lock:
         store = _load()
         if not verify_password(current or "", store.get("password_hash", "")):
-            return False, "Aktuelles Passwort falsch"
+            return False, "current_wrong"
         if len(new or "") < PASSWORD_MINLEN:
-            return False, f"Neues Passwort zu kurz (mindestens {PASSWORD_MINLEN} Zeichen)"
+            return False, "password_short"
         store["password_hash"] = hash_password(new)
         _save(store)
         return True, "ok"
@@ -219,7 +219,7 @@ def enable_totp(secret, code):
     """Aktiviert 2FA, wenn der eingegebene Code zum (pending) Secret passt."""
     with _store_lock:
         if not totp_verify(secret, code or ""):
-            return False, "Code stimmt nicht — bitte erneut versuchen"
+            return False, "totp_mismatch"
         store = _load()
         store["totp_secret"] = secret
         store["totp_enabled"] = True
@@ -231,7 +231,7 @@ def disable_totp(password):
     with _store_lock:
         store = _load()
         if not verify_password(password or "", store.get("password_hash", "")):
-            return False, "Passwort falsch"
+            return False, "password_wrong"
         store["totp_secret"] = None
         store["totp_enabled"] = False
         _save(store)

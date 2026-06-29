@@ -11,6 +11,10 @@
 - `auth.py` auf Datei-Store umgebaut (Konto-Verwaltung, optionales TOTP); neue Endpunkte `/auth/setup`, `/auth/status`, `/auth/password`, `/auth/2fa/init|enable|disable`, `/settings`. nginx: `/auth/`-Prefix + geschützte `/settings`.
 - **Template/Compose vereinfacht**: nur noch `AUTH_ENABLED` + `COOKIE_SECURE` + `/config`-Volume; `ADMIN_*`/`TOTP_SECRET`/`SESSION_SECRET` entfernt. Auth-Flow lokal getestet (Setup/Login/2FA an+aus/Session/Persistenz grün).
 
+### 🌐 Login/Setup/Einstellungen in 12 Sprachen
+- Die Auth-Seiten (Anmeldung, Ersteinrichtung, Einstellungen) sind jetzt in allen **12 EU-Sprachen** (DE, EN, FR, ES, IT, PT, NL, PL, SV, DA, CS, EL) verfügbar, mit **Sprachwähler** oben rechts. Neue Datei [`assets/i18n/auth-i18n.js`](assets/i18n/auth-i18n.js) (54 Strings × 12 Sprachen).
+- Sprache wird mit dem Dashboard geteilt (`localStorage.stmLang`) und automatisch aus der Browsersprache vorab erkannt. Auch Server-Fehlermeldungen sind übersetzt (Backend liefert nur noch Fehler-Codes, Frontend übersetzt). Logo + Favicon (Self-Schild) + originaler Wortmarken-Schriftzug auf allen Auth-Seiten.
+
 ---
 
 ## v2.8.0 — 29.06.2026

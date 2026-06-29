@@ -1066,7 +1066,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
 
     # ── POST-Handler einzelner Auth-Aktionen ──
     def _handle_setup_post(self):
-        from urllib.parse import parse_qs, quote
+        from urllib.parse import parse_qs
         if auth.is_setup_done():
             self._redirect("/auth/login")
             return
@@ -1076,11 +1076,11 @@ class MetricsHandler(BaseHTTPRequestHandler):
         password = form.get("password", [""])[0]
         password2 = form.get("password2", [""])[0]
         if password != password2:
-            self._redirect("/auth/setup?error=" + quote("Die Passwörter stimmen nicht überein."))
+            self._redirect("/auth/setup?err=pw_mismatch")
             return
-        ok, msg = auth.create_account(username, password)
+        ok, code = auth.create_account(username, password)
         if not ok:
-            self._redirect("/auth/setup?error=" + quote(msg))
+            self._redirect("/auth/setup?err=" + code)
             return
         log(f"✅ Administrator-Konto angelegt: {username}")
         self._redirect("/settings", cookie_token=auth.make_session(username))
@@ -1140,8 +1140,8 @@ class MetricsHandler(BaseHTTPRequestHandler):
         if self.path == "/auth/password":
             if self._require_user() is None: return
             d = self._read_json()
-            ok, msg = auth.change_password(d.get("current", ""), d.get("new", ""))
-            self._json_response(200 if ok else 400, {"ok": ok, "message": msg}); return
+            ok, code = auth.change_password(d.get("current", ""), d.get("new", ""))
+            self._json_response(200 if ok else 400, {"ok": ok, "code": code}); return
         if self.path == "/auth/2fa/init":
             user = self._require_user()
             if user is None: return
@@ -1151,15 +1151,15 @@ class MetricsHandler(BaseHTTPRequestHandler):
         if self.path == "/auth/2fa/enable":
             if self._require_user() is None: return
             d = self._read_json()
-            ok, msg = auth.enable_totp((d.get("secret") or "").strip(), (d.get("code") or "").strip())
+            ok, code = auth.enable_totp((d.get("secret") or "").strip(), (d.get("code") or "").strip())
             if ok: log("🔐 2FA aktiviert")
-            self._json_response(200 if ok else 400, {"ok": ok, "message": msg}); return
+            self._json_response(200 if ok else 400, {"ok": ok, "code": code}); return
         if self.path == "/auth/2fa/disable":
             if self._require_user() is None: return
             d = self._read_json()
-            ok, msg = auth.disable_totp(d.get("password", ""))
+            ok, code = auth.disable_totp(d.get("password", ""))
             if ok: log("🔓 2FA deaktiviert")
-            self._json_response(200 if ok else 400, {"ok": ok, "message": msg}); return
+            self._json_response(200 if ok else 400, {"ok": ok, "code": code}); return
 
         self._json_response(404, {"error": "Not found"})
 
