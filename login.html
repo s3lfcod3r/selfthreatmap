@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="/assets/logo/shield.png">
 <title>SelfThreatMap — Anmeldung</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;800;900&display=swap');
   :root{
     --bg:#020a12; --panel:rgba(6,18,28,0.92); --accent:#00e5c8;
     --text:#cfeee6; --dim:rgba(0,229,200,0.30); --err:#ff5d6c;
@@ -23,11 +25,12 @@
     border:1px solid var(--dim); border-radius:14px; padding:30px 26px;
     box-shadow:0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,229,200,0.05) inset;
   }
-  .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
-  .brand .dot{width:11px; height:11px; border-radius:50%; background:var(--accent);
-    box-shadow:0 0 14px var(--accent); animation:pulse 2.2s ease-in-out infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
-  h1{font-size:18px; letter-spacing:1px; margin:0; color:#eafff9;}
+  .brand{display:flex; align-items:center; gap:11px; margin-bottom:8px;}
+  .brand-shield{width:30px; height:30px; object-fit:contain;
+    filter:drop-shadow(0 0 8px rgba(0,229,200,0.45));}
+  .wordmark{font-family:'Orbitron',monospace; font-weight:800; font-size:19px;
+    letter-spacing:1px; color:#9dbdd0; text-shadow:0 0 14px rgba(51,167,140,0.5);}
+  .wordmark span{color:#33a78c;}
   .sub{font-size:11px; color:rgba(160,255,216,0.5); margin:4px 0 22px; letter-spacing:.5px;}
   label{display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase;
     color:var(--accent); opacity:.8; margin:14px 0 5px;}
@@ -59,8 +62,11 @@
 </head>
 <body>
   <form class="card" method="POST" action="/auth/login" autocomplete="off">
-    <div class="brand"><span class="dot"></span><h1>SelfThreatMap</h1></div>
-    <p class="sub">Zugang nur fuer autorisierte Nutzer</p>
+    <div class="brand">
+      <img class="brand-shield" src="/assets/logo/shield.png" alt="SelfThreatMap">
+      <span class="wordmark">Self<span>ThreatMap</span></span>
+    </div>
+    <p class="sub">Zugang nur für autorisierte Nutzer</p>
 
     <div class="err" id="err">Anmeldung fehlgeschlagen. Bitte erneut versuchen.</div>
 
@@ -77,7 +83,7 @@
     </div>
 
     <button type="submit">Anmelden</button>
-    <p class="foot" id="foot">Geschuetzt durch Passwort</p>
+    <p class="foot" id="foot">Geschützt durch Passwort</p>
   </form>
   <script>
     if (new URLSearchParams(location.search).get('error')) {
@@ -91,7 +97,7 @@
       if (s.totp_enabled) {
         document.getElementById('totp-wrap').style.display = '';
         document.getElementById('t').setAttribute('required','');
-        document.getElementById('foot').textContent = 'Geschuetzt durch Passwort + Zwei-Faktor (2FA)';
+        document.getElementById('foot').textContent = 'Geschützt durch Passwort + Zwei-Faktor (2FA)';
       }
     }).catch(function(){});
   </script>
