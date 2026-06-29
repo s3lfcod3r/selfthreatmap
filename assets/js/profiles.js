@@ -212,6 +212,13 @@ function toggleProfileDropdown(e){
 function closeProfileDropdown(){ const p=document.getElementById('profile-dd-panel'); if(p)p.classList.remove('open'); }
 document.addEventListener('click', function(e){ const dd=document.getElementById('profile-dd'); if(dd && !dd.contains(e.target)) closeProfileDropdown(); });
 
+/* Gespeicherte Profil-Auswahl beim Start wiederherstellen */
+function restoreProfileSelection(){
+  let saved=''; try{ saved=localStorage.getItem('stmProfile')||''; }catch(e){}
+  if(saved && PROFILES.some(p=>p.id===saved)) currentProfile = saved;
+}
+
 /* Selbst-Init (unabhängig von app.js) — wie beim Raketen-Stil-Select */
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ buildProfileDropdown(); syncProfileDropdown(); });
-else { buildProfileDropdown(); syncProfileDropdown(); }
+function initProfiles(){ restoreProfileSelection(); buildProfileDropdown(); syncProfileDropdown(); }
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', initProfiles);
+else { initProfiles(); }
