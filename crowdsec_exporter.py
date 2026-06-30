@@ -10,8 +10,8 @@ import os
 import ipaddress
 
 CROWDSEC_CONTAINER = os.environ.get("CROWDSEC_CONTAINER_NAME", "crowdsec")
-# Unban-Autorisierung laeuft jetzt ueber die Login-Session (siehe auth.py),
-# nicht mehr ueber ein statisches API-Token.
+# Unban-Autorisierung läuft jetzt über die Login-Session (siehe auth.py),
+# nicht mehr über ein statisches API-Token.
 
 def validate_ip(ip):
     """IPv4/IPv6 prüfen — Schutz vor ungültigen cscli-Argumenten und YAML-Injection."""
@@ -77,12 +77,12 @@ _SETTINGS_PAGE = _load_page("settings.html", b"<!doctype html><meta charset=utf-
 ### ====================================================
 ### ⚙️  KONFIGURATION
 ### Werte werden aus Umgebungsvariablen gelesen (Docker).
-### Fallback-Pfade fuer Direktbetrieb ohne Docker.
+### Fallback-Pfade für Direktbetrieb ohne Docker.
 ### ====================================================
 DB_PATH      = os.environ.get("CROWDSEC_DB_PATH",    "/crowdsec/data/crowdsec.db")
 MMDB_PATH    = os.environ.get("CROWDSEC_MMDB_PATH",  "/crowdsec/data/GeoLite2-City.mmdb")
 LISTEN_PORT  = int(os.environ.get("LISTEN_PORT",     "9456"))
-# Nur lokal binden — nginx (localhost) proxied nach aussen. Schuetzt /unban
+# Nur lokal binden — nginx (localhost) proxied nach außen. Schützt /unban
 # davor, dass andere Container im Docker-Netz den Exporter direkt erreichen.
 LISTEN_HOST  = os.environ.get("LISTEN_HOST",         "127.0.0.1")
 CACHE_TTL    = int(os.environ.get("CACHE_TTL",       "60"))
@@ -802,7 +802,7 @@ def load_drops():
 def load_metrics():
     if not os.path.exists(DB_PATH):
         log(f"❌ DB nicht gefunden: {DB_PATH}")
-        return "# ERROR: Datenbank nicht verfuegbar\n"
+        return "# ERROR: Datenbank nicht verfügbar\n"
 
     cutoff    = int(time.time()) - (DAYS_BACK * 86400)
     lines     = []
@@ -1017,14 +1017,14 @@ class MetricsHandler(BaseHTTPRequestHandler):
         return self.client_address[0] if self.client_address else "?"
 
     def _request_user(self):
-        """Username aus gueltiger Session-Cookie, oder None. Bei AUTH_ENABLED=false offen."""
+        """Username aus gültiger Session-Cookie, oder None. Bei AUTH_ENABLED=false offen."""
         if not auth.AUTH_ENABLED:
             return "anonymous"
         cookies = auth.parse_cookies(self.headers.get("Cookie", ""))
         return auth.verify_session(cookies.get(auth.SESSION_COOKIE, ""))
 
     def _require_user(self):
-        """Gibt Username zurueck oder sendet 401 und gibt None zurueck."""
+        """Gibt Username zurück oder sendet 401 und gibt None zurück."""
         user = self._request_user()
         if user is None:
             self._json_response(401, {"ok": False, "message": "Nicht angemeldet"})
@@ -1041,7 +1041,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
             return {}
 
     def _set_session_cookie(self, token):
-        # SameSite=Strict gegen CSRF; Secure wenn nur ueber HTTPS erreichbar.
+        # SameSite=Strict gegen CSRF; Secure wenn nur über HTTPS erreichbar.
         cookie = (f"{auth.SESSION_COOKIE}={token}; Path=/; HttpOnly; "
                   f"SameSite=Strict; Max-Age={auth.SESSION_TTL}")
         if os.environ.get("COOKIE_SECURE", "false").lower() == "true":
@@ -1136,7 +1136,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
         if self.path == "/unban":
             self._handle_unban(); return
 
-        # Konto-Verwaltung: JSON-POST, erfordert gueltige Session
+        # Konto-Verwaltung: JSON-POST, erfordert gültige Session
         if self.path == "/auth/password":
             if self._require_user() is None: return
             d = self._read_json()
@@ -1197,14 +1197,14 @@ class MetricsHandler(BaseHTTPRequestHandler):
                 self._serve_html(_LOGIN_PAGE)
             return
         if path == "/settings":
-            # Durch nginx auth_request geschuetzt; zusaetzlich hier absichern.
+            # Durch nginx auth_request geschützt; zusätzlich hier absichern.
             if self._request_user() is None:
                 self._redirect("/auth/login")
             else:
                 self._serve_html(_SETTINGS_PAGE)
             return
         if path == "/auth/verify":
-            # Fuer nginx auth_request: 200 = erlaubt, 401 = Login noetig.
+            # Für nginx auth_request: 200 = erlaubt, 401 = Login nötig.
             self.send_response(200 if self._request_user() is not None else 401)
             self.send_header("Content-Length", "0")
             self.end_headers()

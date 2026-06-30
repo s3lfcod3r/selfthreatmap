@@ -40,7 +40,7 @@ const PROFILES = [
     s:{style:'rakete', map:{...STM_DENS.mittel, cityZoomMin:1.5, cityZoomMax:25}}},
   {id:'kino', g:'Grund-Modi', n:'Kino-Modus', d:'Entspannt zuschauen — Auto-Zoom, ruhige Kometen, langsam.',
     s:{style:'komet', anim:true, lines:true, autozoom:true, map:{...STM_DENS.mittel, rocketDurationMs:7000}}},
-  {id:'praesentation', g:'Grund-Modi', n:'Präsentation', d:'Große, gut sichtbare Raketen mit Flight-Labels — zum Zeigen.',
+  {id:'präsentation', g:'Grund-Modi', n:'Präsentation', d:'Große, gut sichtbare Raketen mit Flight-Labels — zum Zeigen.',
     s:{style:'rakete', theme:'cyan', anim:true, lines:true, map:{...STM_DENS.viel, showFlightLabels:true, maxFlightLabels:20, rocketLaneSpread:18}}},
 
   // ── Raketen & Kometen ─────────────────────────────────────

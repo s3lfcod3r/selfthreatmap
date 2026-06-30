@@ -1243,7 +1243,7 @@
 const EXPORTER_URL = 'http://EURE-UNRAID-IP:9456/metrics';
 //  Wird beim Docker-Start automatisch durch entrypoint.sh ersetzt
 
-// Unban-Autorisierung laeuft ueber die Login-Session (Cookie). Kein Token mehr im HTML.
+// Unban-Autorisierung läuft über die Login-Session (Cookie). Kein Token mehr im HTML.
 
 // 2. ⚠️ PFLICHT: Koordinaten eures Servers
 //    → Rechtsklick auf Google Maps → "Was ist hier?" → Zahlen kopieren
@@ -3128,7 +3128,7 @@ async function unbanIPDirect(ip, btn){
 
   try{
     const base=EXPORTER_URL.replace(/\/metrics.*$/,'');
-    // Autorisierung laeuft ueber die Login-Session (Cookie), kein Token im HTML.
+    // Autorisierung läuft über die Login-Session (Cookie), kein Token im HTML.
     const res=await fetch(`${base}/unban`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -3270,8 +3270,8 @@ function feedItemHTML(d){
 }
 function openCtxFeed(ip,country,scenario,count,ev,iprange){ev.stopPropagation();showCtx(ev,{ip,country,scenario,count,iprange});}
 
-// Zentrale Event-Delegation fuer Feed-Buttons — ersetzt Inline-onclick mit
-// interpolierten Backend-Daten (verhindert HTML-/JS-Injection ueber Szenario,
+// Zentrale Event-Delegation für Feed-Buttons — ersetzt Inline-onclick mit
+// interpolierten Backend-Daten (verhindert HTML-/JS-Injection über Szenario,
 // IP-Range, Stadt etc.). Werte kommen sicher aus data-Attributen.
 document.addEventListener('click',function(ev){
   const el=ev.target.closest('[data-act]');

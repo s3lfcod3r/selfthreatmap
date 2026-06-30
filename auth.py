@@ -7,7 +7,7 @@
 #   • Passwort:   PBKDF2-HMAC-SHA256 (200k Iterationen, Salt)
 #   • 2FA:        optional, TOTP nach RFC 6238 (SHA1, 6 Stellen, 30s)
 #   • Session:    HMAC-SHA256-signiertes Cookie (HttpOnly/SameSite)
-#   • Persistenz: /config/auth.json (Volume) — ueberlebt Updates
+#   • Persistenz: /config/auth.json (Volume) — überlebt Updates
 #
 # Alle Geheimnis-Vergleiche laufen zeitkonstant (hmac.compare_digest).
 # ============================================================
@@ -29,7 +29,7 @@ CRED_FILE = os.path.join(CONFIG_DIR, "auth.json")
 SESSION_TTL = int(os.environ.get("SESSION_TTL", "86400"))          # 24h
 SESSION_COOKIE = "stm_session"
 
-# Optionaler Override des Session-Schluessels (sonst in auth.json gespeichert)
+# Optionaler Override des Session-Schlüssels (sonst in auth.json gespeichert)
 _ENV_SESSION_SECRET = os.environ.get("SESSION_SECRET", "").strip()
 
 # PBKDF2-Parameter
@@ -133,7 +133,7 @@ def totp_enabled():
 
 
 def _ensure_session_secret(store):
-    """Stellt sicher, dass ein Session-Schluessel existiert (in-place)."""
+    """Stellt sicher, dass ein Session-Schlüssel existiert (in-place)."""
     if _ENV_SESSION_SECRET:
         return _ENV_SESSION_SECRET
     if not store.get("session_secret"):
@@ -142,13 +142,13 @@ def _ensure_session_secret(store):
 
 
 def session_key():
-    """Aktueller Session-Signierschluessel als Bytes."""
+    """Aktueller Session-Signierschlüssel als Bytes."""
     if _ENV_SESSION_SECRET:
         return _ENV_SESSION_SECRET.encode("utf-8")
     s = _load()
     key = s.get("session_secret")
     if not key:
-        # Noch kein Konto/Schluessel -> ephemerer Zufallswert (keine Sessions moeglich)
+        # Noch kein Konto/Schlüssel -> ephemerer Zufallswert (keine Sessions möglich)
         return b"__no_session_secret_configured__"
     return key.encode("utf-8")
 
@@ -168,7 +168,7 @@ def validate_username(name):
 
 
 def create_account(username, password):
-    """Legt das erste Konto an. Gibt (ok, code) zurueck — code = i18n-Schluessel."""
+    """Legt das erste Konto an. Gibt (ok, code) zurück — code = i18n-Schlüssel."""
     with _store_lock:
         if is_setup_done():
             return False, "account_exists"
@@ -190,7 +190,7 @@ def create_account(username, password):
 
 
 def verify_login(username, password, code):
-    """Login-Pruefung: Benutzer + Passwort (+ 2FA falls aktiviert)."""
+    """Login-Prüfung: Benutzer + Passwort (+ 2FA falls aktiviert)."""
     store = _load()
     if not store.get("password_hash"):
         return False
