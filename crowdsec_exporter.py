@@ -40,7 +40,7 @@ def run_unban(ip):
             log(f"✅ Unban erfolgreich: {ip}")
             # IP merken damit sie nicht mehr im Feed erscheint
             with _cache_lock:
-                _unbanned_ips.add(ip)
+                _unbanned_ips[ip] = time.time()
                 _cache_time = 0  # Cache invalidieren → sofort neu laden
             return True, f"IP {ip} erfolgreich entsperrt"
         else:
@@ -57,7 +57,7 @@ import json
 import time
 import threading
 from collections import deque
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timezone
 import sys
 import auth  # Login + 2FA (TOTP), Session-Cookies — siehe auth.py
@@ -67,7 +67,9 @@ def _load_page(name, fallback):
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), name), "rb") as f:
             return f.read()
-    except Exception:
+    except Exception as exc:
+        # log() ist zur Importzeit noch nicht definiert -> direkt nach stderr.
+        sys.stderr.write(f"[WARN] Seite {name} nicht ladbar ({exc}) — Fallback wird genutzt.\n")
         return fallback
 
 _LOGIN_PAGE = _load_page("login.html", b"<!doctype html><meta charset=utf-8><title>Login</title><form method=post action=/auth/login><input name=username><input name=password type=password><input name=totp><button>Anmelden</button></form>")
@@ -318,7 +320,7 @@ def geo_fallback(country_iso):
 _cache_lock    = threading.Lock()
 _cache_metrics = ""
 _cache_time    = 0
-_unbanned_ips  = set()  # IPs die manuell entsperrt wurden
+_unbanned_ips  = {}   # {ip: unban_timestamp} — manuell entsperrte IPs (mit Zeitstempel, damit alte Einträge ablaufen)
 _mmdb          = None
 _ip_geo_cache  = {}   # Geo-Cache (von /drops genutzt; leer = Fallback auf MMDB/geo_lookup)
 
@@ -1000,6 +1002,13 @@ def get_metrics():
     with _cache_lock:
         if time.time() - _cache_time > CACHE_TTL:
             log("🔄 Lade Metriken neu...")
+            # Abgelaufene Unban-Einträge entfernen — nach DAYS_BACK fallen die IPs
+            # ohnehin aus dem Feed (cutoff-Filter), also darf _unbanned_ips nicht
+            # unbegrenzt wachsen.
+            expiry = time.time() - (DAYS_BACK * 86400)
+            stale = [ip for ip, ts in _unbanned_ips.items() if ts < expiry]
+            for ip in stale:
+                del _unbanned_ips[ip]
             _cache_metrics = load_metrics()
             _cache_time = time.time()
         return _cache_metrics
@@ -1301,7 +1310,7 @@ if __name__ == "__main__":
     log("📊 Initialer Metrik-Load...")
     get_metrics()
 
-    server = HTTPServer((LISTEN_HOST, LISTEN_PORT), MetricsHandler)
+    server = ThreadingHTTPServer((LISTEN_HOST, LISTEN_PORT), MetricsHandler)
     log(f"✅ Exporter läuft auf http://{LISTEN_HOST}:{LISTEN_PORT}/metrics")
     log("   Drücke CTRL+C zum Beenden")
 

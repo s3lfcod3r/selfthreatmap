@@ -21,6 +21,9 @@ import hashlib
 import secrets
 import struct
 import threading
+import logging
+
+_log = logging.getLogger("selfthreatmap.auth")
 
 # ── Konfiguration ───────────────────────────────────────────
 AUTH_ENABLED = os.environ.get("AUTH_ENABLED", "true").strip().lower() == "true"
@@ -58,7 +61,8 @@ def verify_password(password, stored):
         dk = hashlib.pbkdf2_hmac(algo.replace("pbkdf2_", ""), password.encode("utf-8"),
                                  bytes.fromhex(salt_hex), int(iter_s))
         return hmac.compare_digest(dk, bytes.fromhex(hash_hex))
-    except Exception:
+    except Exception as exc:
+        _log.debug("verify_password: ungültiges Hash-Format/Fehler: %s", exc)
         return False
 
 
@@ -102,7 +106,26 @@ def _load():
     try:
         with open(CRED_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except FileNotFoundError:
+        # Legitim: noch kein Konto angelegt -> leerer Store.
+        return {}
+    except Exception as exc:
+        # Korrupte/nicht lesbare Datei NIEMALS still als {} behandeln —
+        # sonst "verschwindet" das Konto und der Setup-Assistent taucht neu auf.
+        # Kaputte Datei sichern, bevor irgendetwas sie überschreibt.
+        backup = CRED_FILE + ".corrupt"
+        try:
+            os.replace(CRED_FILE, backup)
+            _log.error(
+                "auth.json unlesbar/korrupt (%s) — Datei nach %s gesichert. "
+                "Konto muss ggf. manuell wiederhergestellt werden.",
+                exc, backup,
+            )
+        except Exception as move_exc:
+            _log.error(
+                "auth.json unlesbar/korrupt (%s) UND Sicherung nach %s fehlgeschlagen (%s).",
+                exc, backup, move_exc,
+            )
         return {}
 
 
@@ -111,11 +134,52 @@ def _save(store):
     tmp = CRED_FILE + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(store, f, indent=2)
+        # Daten physisch auf Platte zwingen, bevor atomar ersetzt wird —
+        # verhindert leere/halbe auth.json nach Stromausfall/Crash.
+        f.flush()
+        os.fsync(f.fileno())
     try:
         os.chmod(tmp, 0o600)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("chmod 0600 auf %s fehlgeschlagen: %s", tmp, exc)
     os.replace(tmp, CRED_FILE)
+    # Verzeichnis-Eintrag ebenfalls syncen (Linux) — sonst kann der Rename
+    # bei Crash verloren gehen. Auf Plattformen ohne Verzeichnis-fsync ignorieren.
+    try:
+        dir_fd = os.open(CONFIG_DIR, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except (OSError, AttributeError) as exc:
+        _log.debug("Verzeichnis-fsync auf %s nicht möglich: %s", CONFIG_DIR, exc)
+
+
+class _Abort(Exception):
+    """Signalisiert _update, dass NICHT gespeichert werden soll (Validierung fehlgeschlagen)."""
+
+    def __init__(self, result):
+        super().__init__()
+        self.result = result
+
+
+def _update(fn):
+    """Atomar unter _store_lock: _load() -> fn(store) -> _save(store).
+
+    fn ändert store in-place und liefert den durchgereichten Rückgabewert.
+    Wirft fn ein _Abort, wird NICHT gespeichert und _Abort.result zurückgegeben —
+    so bleibt bei fehlgeschlagener Validierung nichts halb geschrieben.
+    Verhindert Load-Modify-Save-Races zwischen change_password/enable_totp/
+    disable_totp, sodass kein sichtbarer Zwischenzustand entsteht.
+    """
+    with _store_lock:
+        store = _load()
+        try:
+            result = fn(store)
+        except _Abort as abort:
+            return abort.result
+        _save(store)
+        return result
 
 
 def is_setup_done():
@@ -204,38 +268,38 @@ def verify_login(username, password, code):
 
 
 def change_password(current, new):
-    with _store_lock:
-        store = _load()
+    def _fn(store):
         if not verify_password(current or "", store.get("password_hash", "")):
-            return False, "current_wrong"
+            raise _Abort((False, "current_wrong"))
         if len(new or "") < PASSWORD_MINLEN:
-            return False, "password_short"
+            raise _Abort((False, "password_short"))
         store["password_hash"] = hash_password(new)
-        _save(store)
         return True, "ok"
+
+    return _update(_fn)
 
 
 def enable_totp(secret, code):
     """Aktiviert 2FA, wenn der eingegebene Code zum (pending) Secret passt."""
-    with _store_lock:
+    def _fn(store):
         if not totp_verify(secret, code or ""):
-            return False, "totp_mismatch"
-        store = _load()
+            raise _Abort((False, "totp_mismatch"))
         store["totp_secret"] = secret
         store["totp_enabled"] = True
-        _save(store)
         return True, "ok"
+
+    return _update(_fn)
 
 
 def disable_totp(password):
-    with _store_lock:
-        store = _load()
+    def _fn(store):
         if not verify_password(password or "", store.get("password_hash", "")):
-            return False, "password_wrong"
+            raise _Abort((False, "password_wrong"))
         store["totp_secret"] = None
         store["totp_enabled"] = False
-        _save(store)
         return True, "ok"
+
+    return _update(_fn)
 
 
 # ── Session-Cookies (signiert) ──────────────────────────────
@@ -266,7 +330,8 @@ def verify_session(token):
         if int(payload.get("exp", 0)) < int(time.time()):
             return None
         return payload.get("u")
-    except Exception:
+    except Exception as exc:
+        _log.debug("verify_session: ungültiges/kaputtes Token: %s", exc)
         return None
 
 
