@@ -2,7 +2,7 @@
 # CrowdSec → Prometheus Exporter
 # Liest direkt aus der CrowdSec SQLite-DB + MaxMind GeoLite2-City.mmdb
 # Keine externen pip-Pakete nötig – nur Python3 stdlib + mmdb pure-python reader
-# Version: 2.2 | 2026-05-21
+# Version: 2.9.0 | 2026-06-29
 # Port: 9456
 
 import subprocess
@@ -138,13 +138,11 @@ class MMDBReader:
         record_size = self.record_size
         offset = node * self.node_byte_size
         if record_size == 28:
-            b = self.data[offset:offset+4]
+            b = self.data[offset:offset+7]
             if bit == 0:
-                return ((b[3] & 0xF0) << 20) | struct.unpack(">I", b'\x00' + b[:3])[0]
+                return ((b[3] & 0xF0) << 20) | (b[0] << 16) | (b[1] << 8) | b[2]
             else:
-                return ((b[3] & 0x0F) << 24) | struct.unpack(">I", b'\x00' + b[4:7])[0] if len(b) > 6 else \
-                       ((b[3] & 0x0F) << 24) | (b[4] << 16 | b[5] << 8 | b[6]) if len(self.data[offset:offset+7]) == 7 else \
-                       struct.unpack(">I", self.data[offset+3:offset+7])[0] & 0x0FFFFFFF
+                return ((b[3] & 0x0F) << 24) | (b[4] << 16) | (b[5] << 8) | b[6]
         elif record_size == 24:
             if bit == 0:
                 return struct.unpack(">I", b'\x00' + self.data[offset:offset+3])[0]
