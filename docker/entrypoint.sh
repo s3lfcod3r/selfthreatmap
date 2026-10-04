@@ -2,13 +2,13 @@
 set -e
 
 # ============================================================
-# CrowdSec Threat Map — Container Entrypoint v2.9.0
+# CrowdSec Threat Map — Container Entrypoint v2.9.1
 # ============================================================
 
 log() { echo "[$(date '+%F %T')] $*"; }
 
 log "🛡️  CrowdSec Threat Map startet..."
-log "   Version: v2.9.0"
+log "   Version: v2.9.1"
 
 # ── Pflichtprüfungen ──
 if [ -z "$SERVER_LAT" ] || [ "$SERVER_LAT" = "0.0" ]; then

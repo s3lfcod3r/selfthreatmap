@@ -2,7 +2,7 @@
 # CrowdSec → Prometheus Exporter
 # Liest direkt aus der CrowdSec SQLite-DB + MaxMind GeoLite2-City.mmdb
 # Keine externen pip-Pakete nötig – nur Python3 stdlib + mmdb pure-python reader
-# Version: 2.9.0 | 2026-06-29
+# Version: 2.9.1 | 2026-10-04
 # Port: 9456
 
 import subprocess
@@ -115,10 +115,14 @@ def log(msg):
 # Minimaler MaxMind MMDB Reader (pure Python, keine pip-Pakete)
 # ---------------------------------------------------------------------------
 class MMDBReader:
+    _CACHE_MAX = 20000
+
     def __init__(self, path):
         with open(path, "rb") as f:
             self.data = f.read()
         self._parse_metadata()
+        self._cache = {}             # IP -> Ergebnis (dict) oder None (Fehler)
+        self._cache_lock = threading.Lock()
 
     def _parse_metadata(self):
         marker = b"\xab\xcd\xefMaxMind.com"
@@ -183,8 +187,9 @@ class MMDBReader:
             return None
         return node
 
-    def _decode(self, data, offset):
-        if offset >= len(data):
+    def _decode(self, data, offset, depth=0):
+        # Obergrenzen: nicht jenseits der Daten, Tiefe beschränken
+        if offset < 0 or offset >= len(data) or depth > 64:
             return None, offset
         ctrl = data[offset]
         offset += 1
@@ -199,18 +204,22 @@ class MMDBReader:
             size = struct.unpack(">H", data[offset:offset+2])[0] + 285; offset += 2
         elif size == 31:
             size = struct.unpack(">I", b'\x00' + data[offset:offset+3])[0] + 65821; offset += 3
+        # Obergrenze: size darf nicht absurd groß sein
+        if size < 0 or size > len(data):
+            return None, offset
 
         if type_num == 1:
             ptr_size = ((ctrl >> 3) & 0x3)
             if ptr_size == 0:
                 ptr = ((ctrl & 0x7) << 8) | data[offset]; offset += 1
             elif ptr_size == 1:
-                ptr = ((ctrl & 0x7) << 16) | (data[offset] << 8) | data[offset+1] + 2048; offset += 2
+                ptr = (((ctrl & 0x7) << 16) | (data[offset] << 8) | data[offset+1]) + 2048; offset += 2
             elif ptr_size == 2:
-                ptr = ((ctrl & 0x7) << 24) | struct.unpack(">I", b'\x00' + data[offset:offset+3])[0] + 526336; offset += 3
+                ptr = (((ctrl & 0x7) << 24) | struct.unpack(">I", b'\x00' + data[offset:offset+3])[0]) + 526336; offset += 3
             else:
                 ptr = struct.unpack(">I", data[offset:offset+4])[0]; offset += 4
-            val, _ = self._decode(data, ptr)
+            # Pointer relativ zu data_offset (Basis der Datensektion)
+            val, _ = self._decode(data, self.data_offset + ptr, depth + 1)
             return val, offset
         elif type_num == 2:
             return data[offset:offset+size].decode("utf-8", errors="replace"), offset+size
@@ -229,8 +238,8 @@ class MMDBReader:
         elif type_num == 7:
             result = {}
             for _ in range(size):
-                key, offset = self._decode(data, offset)
-                val, offset = self._decode(data, offset)
+                key, offset = self._decode(data, offset, depth + 1)
+                val, offset = self._decode(data, offset, depth + 1)
                 result[key] = val
             return result, offset
         elif type_num == 8:
@@ -243,7 +252,7 @@ class MMDBReader:
         elif type_num == 11:
             result = []
             for _ in range(size):
-                val, offset = self._decode(data, offset)
+                val, offset = self._decode(data, offset, depth + 1)
                 result.append(val)
             return result, offset
         elif type_num == 14:
@@ -253,28 +262,39 @@ class MMDBReader:
         return None, offset+size
 
     def get(self, ip_str):
+        with self._cache_lock:
+            if ip_str in self._cache:
+                return self._cache[ip_str]
         try:
             node = self._search(ip_str)
             if node is None:
-                return None
-            data_record_offset = node - self.node_count - 16
-            record, _ = self._decode(self.data, self.data_offset + data_record_offset)
-            if not isinstance(record, dict):
-                return None
-            result = {}
-            loc = record.get("location", {})
-            result["lat"] = loc.get("latitude", 0.0)
-            result["lon"] = loc.get("longitude", 0.0)
-            country = record.get("country", {})
-            result["country_iso"]  = country.get("iso_code", "??")
-            en = country.get("names", {})
-            result["country_name"] = en.get("en", "Unknown") if isinstance(en, dict) else "Unknown"
-            city = record.get("city", {})
-            city_names = city.get("names", {})
-            result["city"] = city_names.get("en", "") if isinstance(city_names, dict) else ""
-            return result
+                result = None
+            else:
+                data_record_offset = node - self.node_count - 16
+                record, _ = self._decode(self.data, self.data_offset + data_record_offset)
+                if not isinstance(record, dict):
+                    result = None
+                else:
+                    result = {}
+                    loc = record.get("location", {})
+                    result["lat"] = loc.get("latitude", 0.0)
+                    result["lon"] = loc.get("longitude", 0.0)
+                    country = record.get("country", {})
+                    result["country_iso"]  = country.get("iso_code", "??")
+                    en = country.get("names", {})
+                    result["country_name"] = en.get("en", "Unknown") if isinstance(en, dict) else "Unknown"
+                    city = record.get("city", {})
+                    city_names = city.get("names", {})
+                    result["city"] = city_names.get("en", "") if isinstance(city_names, dict) else ""
         except Exception:
-            return None
+            result = None
+        with self._cache_lock:
+            self._cache[ip_str] = result
+            if len(self._cache) > self._CACHE_MAX:
+                excess = len(self._cache) - self._CACHE_MAX
+                for key in list(self._cache.keys())[:excess]:
+                    del self._cache[key]
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -318,6 +338,9 @@ def geo_fallback(country_iso):
 _cache_lock    = threading.Lock()
 _cache_metrics = ""
 _cache_time    = 0
+# Hintergrund-Refresh: get_metrics blockiert nie, alter Stand sofort
+_metrics_lock    = threading.Lock()
+_refresh_running = False
 _unbanned_ips  = {}   # {ip: unban_timestamp} — manuell entsperrte IPs (mit Zeitstempel, damit alte Einträge ablaufen)
 _mmdb          = None
 _ip_geo_cache  = {}   # Geo-Cache (von /drops genutzt; leer = Fallback auf MMDB/geo_lookup)
@@ -885,14 +908,8 @@ def load_metrics():
             # Geo
             if db_lat and db_lon and (db_lat != 0.0 or db_lon != 0.0):
                 lat, lon = db_lat, db_lon
-                city = ""
-                if _mmdb:
-                    r = _mmdb.get(ip)
-                    if r:
-                        city = r.get("city", "")
-                # Fallback: nächste Stadt aus Koordinaten
-                if not city:
-                    city = nearest_city(lat, lon)
+                # Stadt direkt aus den CrowdSec-Koordinaten — keine MMDB-Abfrage
+                city = nearest_city(lat, lon)
             else:
                 lat, lon, city = geo_lookup(ip, country)
 
@@ -995,21 +1012,57 @@ def load_metrics():
     return "\n".join(lines) + "\n"
 
 
+# Hintergrund-Refresh: Metriken laden, ohne /metrics zu blockieren.
+def _do_load_metrics():
+    """Lädt Metriken synchron und aktualisiert den Cache."""
+    global _cache_metrics, _cache_time
+    # Abgelaufene Unban-Einträge entfernen — nach DAYS_BACK fallen die IPs
+    # ohnehin aus dem Feed (cutoff-Filter), also darf _unbanned_ips nicht
+    # unbegrenzt wachsen.
+    expiry = time.time() - (DAYS_BACK * 86400)
+    with _cache_lock:
+        stale = [ip for ip, ts in _unbanned_ips.items() if ts < expiry]
+        for ip in stale:
+            del _unbanned_ips[ip]
+    new_metrics = load_metrics()
+    with _cache_lock:
+        _cache_metrics = new_metrics
+        _cache_time = time.time()
+
+def _refresh_worker():
+    """Hintergrund-Thread: Load ausführen, Laufflag zurücksetzen."""
+    global _refresh_running
+    try:
+        _do_load_metrics()
+        log("🔄 Metriken-Refresh (Hintergrund) abgeschlossen")
+    except Exception as e:
+        log(f"❌ Metriken-Refresh (Hintergrund) fehlgeschlagen: {e}")
+    finally:
+        with _metrics_lock:
+            _refresh_running = False
+
+def _start_refresh():
+    """Startet einen Hintergrund-Refresh, falls keiner schon läuft."""
+    global _refresh_running
+    with _metrics_lock:
+        if _refresh_running:
+            return
+        _refresh_running = True
+        threading.Thread(target=_refresh_worker, daemon=True, name="metrics-refresh").start()
+
 def get_metrics():
+    """Gibt den aktuellen (ggf. stale) Cache sofort zurück und startet bei
+    Bedarf einen Hintergrund-Refresh. Blockiert nie."""
     global _cache_metrics, _cache_time
     with _cache_lock:
-        if time.time() - _cache_time > CACHE_TTL:
-            log("🔄 Lade Metriken neu...")
-            # Abgelaufene Unban-Einträge entfernen — nach DAYS_BACK fallen die IPs
-            # ohnehin aus dem Feed (cutoff-Filter), also darf _unbanned_ips nicht
-            # unbegrenzt wachsen.
-            expiry = time.time() - (DAYS_BACK * 86400)
-            stale = [ip for ip, ts in _unbanned_ips.items() if ts < expiry]
-            for ip in stale:
-                del _unbanned_ips[ip]
-            _cache_metrics = load_metrics()
-            _cache_time = time.time()
-        return _cache_metrics
+        now = time.time()
+        metrics = _cache_metrics
+        stale = (not metrics) or (now - _cache_time > CACHE_TTL)
+    if stale:
+        _start_refresh()
+    if metrics:
+        return metrics
+    return "# ERROR: Metriken noch nicht geladen (Hintergrund-Refresh läuft)\n"
 
 
 # ---------------------------------------------------------------------------
@@ -1305,8 +1358,11 @@ if __name__ == "__main__":
     else:
         log("ℹ️  Whitelist-Loop deaktiviert (WHITELIST_ENABLED=False)")
 
-    log("📊 Initialer Metrik-Load...")
-    get_metrics()
+    log("📊 Initialer Metrik-Load (synchron, einmalig)...")
+    try:
+        _do_load_metrics()
+    except Exception as e:
+        log(f"❌ Initialer Metrik-Load fehlgeschlagen: {e}")
 
     server = ThreadingHTTPServer((LISTEN_HOST, LISTEN_PORT), MetricsHandler)
     log(f"✅ Exporter läuft auf http://{LISTEN_HOST}:{LISTEN_PORT}/metrics")

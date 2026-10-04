@@ -2,6 +2,17 @@
 
 ---
 
+## v2.9.1 — 04.10.2026
+
+### 🛡️ MMDB-Reader: decode-Fix + IP-Cache + Hintergrund-Refresh
+- **MMDB-Decode korrigiert**: Pointer-Berechnung (Operator-Präzedenz) und relative Auflösung gegenüber `data_offset`; Tiefe- und Größen-Obergrenzen im `_decode`. Gemessen mit echten Daten: Neuaufbau 0,9 s, MMDB-Abfrage unter 1 ms.
+- **IP-Cache im MMDB-Reader** (`_CACHE_MAX=20000`): Ergebnis je IP einmalig aufgelöst und zwischengespeichert (inkl. Fehler `None`).
+- **Stadt ohne MMDB-Abfrage**: Stadt kommt direkt aus den CrowdSec-Koordinaten via `nearest_city(lat, lon)`.
+- **Hintergrund-Refresh**: `/metrics` gibt den aktuellen (ggf. stale) Cache sofort zurück und startet bei Bedarf einen Hintergrund-Refresh — blockiert nie. Initialer Load synchron, einmalig.
+- **Nicht getestet**: Browser/Karte (UI). Nur Backend/Exporter mit echten Daten gemessen.
+
+---
+
 ## v2.9.0 — 29.06.2026
 
 ### 🧙 Setup-Assistent + Einstellungen statt ENV-Secrets
