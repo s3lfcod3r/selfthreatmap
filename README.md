@@ -8,7 +8,7 @@
 **Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank**
 
 [![Version](https://img.shields.io/badge/version-v2.9.1-33a78c?style=flat-square)](CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-GPL--3.0-3fb950?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-All%20rights%20reserved-3fb950?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Docker%20%7C%20Unraid-1db8d4?style=flat-square)](#-installation)
 [![Python](https://img.shields.io/badge/python-3.12-9dbdd0?style=flat-square&logo=python&logoColor=white)](crowdsec_exporter.py)
 [![Docker](https://img.shields.io/badge/ghcr.io-s3lfcod3r%2Fselfthreatmap-00e5c8?style=flat-square&logo=docker&logoColor=white)](https://github.com/s3lfcod3r/selfthreatmap/pkgs/container/selfthreatmap)
@@ -155,8 +155,22 @@ Ohne GeoIP-Datenbank werden nur Länderpunkte angezeigt. [MaxMind GeoLite2-City]
 - [MaxMind GeoLite2](https://www.maxmind.com/en/geolite2/signup)
 - Changelog → [CHANGELOG.md](CHANGELOG.md)
 
-## 📄 License
+## 📄 Lizenz / License
 
-**GNU GPL-3.0** — see [LICENSE](LICENSE). Free to use, modify and share; forks must stay GPL-3.0 and open-source.
+**🇩🇪 Alle Rechte vorbehalten.** © 2026 s3lfcod3r / SelfCoder
+
+Du darfst die Software **privat und nicht-kommerziell** installieren und benutzen (z. B. im Homelab, über Docker oder Unraid).
+
+**Ohne schriftliche Erlaubnis verboten:** kommerzielle Nutzung · Kopieren · Verändern · Weitergeben · Einbauen in eigene Projekte (auch Closed Source) · Verkaufen.
+
+Details: [LICENSE](LICENSE)
+
+**🇬🇧 All rights reserved.** © 2026 s3lfcod3r / SelfCoder
+
+You may install and use the software **privately and non-commercially** (e.g. in your home lab, via Docker or Unraid).
+
+**Not permitted without written permission:** commercial use · copying · modifying · redistributing · incorporating into other projects (including closed source) · selling.
+
+Details: [LICENSE](LICENSE)
 
 > *SelfThreatMap — part of the Self suite by [s3lfcod3r](https://github.com/s3lfcod3r). Built on the original CrowdSec Threat Map.*
