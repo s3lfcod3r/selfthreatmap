@@ -543,6 +543,8 @@
   #theme-dd-panel{position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:200;display:none;flex-direction:column;gap:2px;padding:4px;background:rgba(2,10,18,0.98);border:1px solid var(--dim);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:230px;overflow-y:auto;}
   #theme-dd-panel.open{display:flex;}
   #theme-dd-panel .theme-btn{flex:none;width:100%;justify-content:flex-start;padding:4px 7px;}
+  #theme-dd-panel .map-pal-head{margin:5px 2px 1px;padding-top:5px;border-top:1px solid var(--dim);font-size:clamp(6px,0.85vw,7.5px);letter-spacing:1px;opacity:0.6;}
+  #map-pal-list{display:flex;flex-direction:column;gap:2px;}
   /* LANGUAGE DROPDOWN */
   #lang-dd{position:relative;flex:0 0 auto;}
   #lang-dd-btn{display:flex;align-items:center;gap:3px;padding:3px 6px;border:1px solid rgba(0,229,200,0.22);border-radius:4px;background:rgba(0,10,25,0.6);color:var(--text);cursor:pointer;font-size:12px;line-height:1;transition:all 0.15s;}
@@ -882,6 +884,8 @@
       </section>
       <section id="settings-sec-map-block">
         <h4 id="settings-sec-map">Karte / Server</h4>
+        <label class="settings-field"><span id="set-lbl-map-palette">Kartenfarbe</span><select id="set-map-palette" onchange="setMapPalette(this.value)"></select></label>
+        <p class="settings-hint" id="settings-map-palette-hint">„Wie Theme“ = Karte passt sich dem Farb-Theme an. Oder eine feste Kartenfarbe wählen, unabhängig vom Theme. Wird sofort übernommen.</p>
         <label class="settings-check"><input type="checkbox" id="set-override-coords"> <span id="set-lbl-override">Eigene Koordinaten (überschreibt Docker)</span></label>
         <label class="settings-field"><span id="set-lbl-lat">Breitengrad (LAT)</span><input type="text" id="set-server-lat" inputmode="decimal" placeholder="53.55"></label>
         <label class="settings-field"><span id="set-lbl-lon">Längengrad (LON)</span><input type="text" id="set-server-lon" inputmode="decimal" placeholder="10.00"></label>
@@ -1092,6 +1096,8 @@
             <div class="theme-btn" id="theme-synth" onclick="setTheme('synth')"><div class="theme-swatch" style="background:#ff5ad0;"></div><span>SYNTH</span></div>
             <div class="theme-btn" id="theme-ocean" onclick="setTheme('ocean')"><div class="theme-swatch" style="background:#22d3d3;"></div><span>OCEAN</span></div>
             <div class="theme-btn" id="theme-honeypot" onclick="setTheme('honeypot')"><div class="theme-swatch" style="background:#dc6d22;"></div><span>HONEYPOT</span></div>
+            <div class="map-pal-head" id="map-pal-head">KARTE</div>
+            <div id="map-pal-list"></div>
           </div>
         </div>
         <div id="lang-dd">
@@ -1377,15 +1383,14 @@ const ISO2_NUM={US:'840',CA:'124',MX:'484',BR:'76',AR:'32',GB:'826',DE:'276',FR:
 function hexToRgba(hex,a){const h=(hex||'#888').replace('#','');const n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return`rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;}
 function countryHeatFill(n,maxN){const r=n/Math.max(maxN,1);if(r>=0.45)return `rgba(220,40,70,${0.4+0.35*r})`;if(r>=0.15)return `rgba(160,90,220,${0.25+0.3*r})`;return `rgba(70,100,180,${0.2+0.2*r})`;}
 function countryStaticFill(cc,byCo,byCoCat,maxN){
-  const n=byCo[cc]||0;if(!n)return '#0a1a2e';
+  const n=byCo[cc]||0;if(!n)return activeMapPalette().land;
   const r=n/Math.max(maxN,1);
   const cat=byCoCat[cc]||'other';
   const col=THREAT_TYPES[cat]?.color||THREAT_TYPES.other.color;
   return hexToRgba(col,0.22+r*0.42);
 }
-// Stil „Honeypot-Bogen“: graue Karte, Herkunftsländer in 5 Orange-Stufen (logarithmisch, stärkstes Land = 5)
+// Stil „Honeypot-Bogen“: Herkunftsländer in 5 Heat-Stufen der Kartenfarbe (logarithmisch, stärkstes Land = 5)
 // — auch während der Animation; das Land des Servers leuchtet, solange ein Bogen dorthin läuft
-const HP64_LAND={land:'#2b3138',edge:'#121417',hit:'#f5d76e',m:['#4a3020','#6b3d1f','#8f4c1e','#b65c1f','#dc6d22']};
 let hp64HitOn=false,hp64HomeKey='',hp64HomeId=null;
 function hp64HomeCountryId(){
   const key=SERVER_LAT+','+SERVER_LON;
@@ -1402,15 +1407,16 @@ function updateCountryFillsHp64(){
   events.forEach(e=>{const id=ISO2_NUM[e.country];if(id)byId[id]=(byId[id]||0)+1;});
   const max=Math.max(0,...Object.values(byId));
   const home=hp64HomeCountryId();
+  const pal=activeMapPalette();
   mapG.selectAll('.land')
-    .attr('stroke',HP64_LAND.edge).attr('stroke-width',0.4)
+    .attr('stroke',pal.edge).attr('stroke-width',0.4)
     .attr('fill',function(d){
       const id=String(d.id);
-      if(hp64HitOn&&id===home)return HP64_LAND.hit;
+      if(hp64HitOn&&id===home)return pal.hit;
       const n=byId[id]||0;
-      if(!n)return HP64_LAND.land;
+      if(!n)return pal.land;
       const lvl=max<=1?5:Math.min(5,1+Math.floor(4.999*Math.log(n)/Math.log(max)));
-      return HP64_LAND.m[lvl-1];
+      return pal.heat[lvl-1];
     });
 }
 function hp64SetHit(on){
@@ -1423,8 +1429,9 @@ function hp64SetHit(on){
 function updateCountryFills(){
   if(!mapG)return;
   if(rocketStyle==='hp64'){updateCountryFillsHp64();return;}
-  mapG.selectAll('.land').attr('stroke','rgba(0,229,200,0.09)').attr('stroke-width',0.4);
-  if(animOn){mapG.selectAll('.land').attr('fill','#0a1a2e');return;}
+  const pal=activeMapPalette();
+  mapG.selectAll('.land').attr('stroke',pal.edge).attr('stroke-width',0.4);
+  if(animOn){mapG.selectAll('.land').attr('fill',pal.land);return;}
   const events=liveMode?feedData:getEventsInReplay();
   const byCo={},byCoCat={},catCount={};
   events.forEach(e=>{
@@ -1440,7 +1447,7 @@ function updateCountryFills(){
   mapG.selectAll('.land').attr('fill',function(d){
     const id=String(d.id);
     for(const cc in byCo){if(ISO2_NUM[cc]===id)return countryStaticFill(cc,byCo,byCoCat,maxC);}
-    return '#0a1a2e';
+    return pal.land;
   });
 }
 function labelPxToSvg(px){return px/Math.max(currentScale,0.15);}

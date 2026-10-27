@@ -210,6 +210,78 @@ const THEMES={
 };
 let currentTheme='cyan';
 
+/* ===== Kartenfarbe: folgt dem Theme ('auto') oder separat wählbar =====
+   Pro Palette: Meer, Länder, Ländergrenzen, Gitter, 5 Heat-Stufen (Honeypot-Bogen), Zielland-Highlight.
+   Nicht explizit gesetzte Werte werden aus den Theme-Farben abgeleitet. */
+const MAP_PALETTES={
+  cyan:{sea:'#020d1a',land:'#0a1a2e',edge:'rgba(0,229,200,0.09)',border:'rgba(0,229,200,0.06)',grid:'rgba(0,229,200,0.04)'},
+  honeypot:{sea:'#161a1f',land:'#2b3138',edge:'#121417',border:'#121417',grid:'rgba(255,255,255,0.02)',
+    heat:['#4a3020','#6b3d1f','#8f4c1e','#b65c1f','#dc6d22'],hit:'#f5d76e'},
+};
+const MAP_PALETTE_STORAGE_KEY='stmMapPalette';
+let currentMapPalette='auto';
+function mixHex(a,b,w){
+  const p=h=>{h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];};
+  const x=p(a),y=p(b);
+  return '#'+x.map((v,i)=>Math.round(v+(y[i]-v)*w).toString(16).padStart(2,'0')).join('');
+}
+function getMapPalette(name){
+  const th=THEMES[name]||THEMES.cyan;
+  const land=mixHex(th.bg,th.accent,0.10);
+  const derived={
+    sea:th.bg,land,
+    edge:hexToRgba(th.accent,0.12),border:hexToRgba(th.accent,0.08),grid:hexToRgba(th.accent,0.04),
+    heat:[0.22,0.36,0.52,0.70,0.88].map(w=>mixHex(land,th.accent,w)),
+    hit:th.warn,
+  };
+  const own=MAP_PALETTES[name]||{};
+  return {...derived,...own,heat:own.heat||derived.heat};
+}
+function activeMapPalette(){return getMapPalette(currentMapPalette==='auto'?currentTheme:currentMapPalette);}
+function applyMapPalette(){
+  if(typeof baseSvg==='undefined'||!baseSvg)return;
+  const p=activeMapPalette();
+  baseSvg.select('rect').attr('fill',p.sea);
+  if(typeof mapG!=='undefined'&&mapG){
+    mapG.select('.map-grid').attr('stroke',p.grid);
+    mapG.select('.map-borders').attr('stroke',p.border);
+  }
+  if(typeof updateCountryFills==='function')updateCountryFills();
+}
+function setMapPalette(name){
+  currentMapPalette=(name==='auto'||THEMES[name])?name:'auto';
+  try{localStorage.setItem(MAP_PALETTE_STORAGE_KEY,currentMapPalette);}catch(e){}
+  applyMapPalette();
+  syncMapPaletteUI();
+}
+function loadMapPalette(){
+  try{const v=localStorage.getItem(MAP_PALETTE_STORAGE_KEY);if(v&&(v==='auto'||THEMES[v]))currentMapPalette=v;}catch(e){}
+}
+function mapPaletteLabel(name){
+  if(name==='auto')return (typeof currentLang!=='undefined'&&currentLang!=='de')?'LIKE THEME':'WIE THEME';
+  const b=document.getElementById('theme-'+name);
+  return b?b.querySelector('span:last-child').textContent:name.toUpperCase();
+}
+function buildMapPaletteUI(){
+  const names=['auto',...Object.keys(THEMES)];
+  const list=document.getElementById('map-pal-list');
+  if(list)list.innerHTML=names.map(n=>{
+    const sw=n==='auto'?'conic-gradient(#00e5c8,#ff5ad0,#dc6d22,#00e5c8)':getMapPalette(n).land;
+    return `<div class="theme-btn map-pal-btn" data-pal="${n}" onclick="event.stopPropagation();setMapPalette('${n}')"><div class="theme-swatch" style="background:${sw};"></div><span>${mapPaletteLabel(n)}</span></div>`;
+  }).join('');
+  const sel=document.getElementById('set-map-palette');
+  if(sel)sel.innerHTML=names.map(n=>`<option value="${n}">${mapPaletteLabel(n)}</option>`).join('');
+  syncMapPaletteUI();
+}
+function syncMapPaletteUI(){
+  document.querySelectorAll('.map-pal-btn').forEach(b=>b.classList.toggle('active',b.dataset.pal===currentMapPalette));
+  const sel=document.getElementById('set-map-palette');
+  if(sel)sel.value=currentMapPalette;
+}
+loadMapPalette();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',buildMapPaletteUI);
+else buildMapPaletteUI();
+
 function setTheme(name){
   currentTheme=name;
   const th=THEMES[name]||THEMES.cyan;
@@ -224,10 +296,11 @@ function setTheme(name){
   root.style.setProperty('--bg',th.bg);
   document.body.style.background=th.bg;
   document.body.style.color=th.text;
-  if(baseSvg) baseSvg.select('rect').attr('fill',th.bg==='#080c11'?'#020d1a':th.bg);
+  applyMapPalette();
   document.querySelectorAll('.theme-btn').forEach(d=>{
     d.classList.toggle('active',d.id===`theme-${name}`);
   });
+  syncMapPaletteUI();   // Karten-Buttons teilen sich die Klasse theme-btn
   document.querySelectorAll('.mob-theme-dot').forEach(d=>{
     d.classList.toggle('active',d.id===`mob-t-${name}`);
   });

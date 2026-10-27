@@ -102,13 +102,13 @@ function onResize(){
 function drawBaseMap(){
   const countries=topojson.feature(worldData,worldData.objects.countries);
   const borders=topojson.mesh(worldData,worldData.objects.countries,(a,b)=>a!==b);
-  const bgCol=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#080c11';
-  baseSvg.append('rect').attr('width',W).attr('height',H).attr('fill',bgCol==='#080c11'?'#020d1a':bgCol);
+  const pal=activeMapPalette();   // Kartenfarbe (ui.js): folgt dem Theme oder separat gewählt
+  baseSvg.append('rect').attr('width',W).attr('height',H).attr('fill',pal.sea);
   mapG=baseSvg.append('g').attr('id','map-g');
-  mapG.append('path').datum(d3.geoGraticule()()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,229,200,0.04)').attr('stroke-width',0.5);
+  mapG.append('path').attr('class','map-grid').datum(d3.geoGraticule()()).attr('d',pathGen).attr('fill','none').attr('stroke',pal.grid).attr('stroke-width',0.5);
   countriesGeo=countries.features;
-  mapG.selectAll('.land').data(countriesGeo).join('path').attr('class','land').attr('d',pathGen).attr('fill','#0a1a2e').attr('stroke','rgba(0,229,200,0.09)').attr('stroke-width',0.4);
-  mapG.append('path').datum(borders).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,229,200,0.06)').attr('stroke-width',0.3);
+  mapG.selectAll('.land').data(countriesGeo).join('path').attr('class','land').attr('d',pathGen).attr('fill',pal.land).attr('stroke',pal.edge).attr('stroke-width',0.4);
+  mapG.append('path').attr('class','map-borders').datum(borders).attr('d',pathGen).attr('fill','none').attr('stroke',pal.border).attr('stroke-width',0.3);
   dotG=baseSvg.append('g').attr('id','dot-g');
   drawServerDots();
 }
