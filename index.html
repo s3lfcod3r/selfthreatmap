@@ -1091,6 +1091,7 @@
             <div class="theme-btn" id="theme-mono" onclick="setTheme('mono')"><div class="theme-swatch" style="background:#e6edf2;"></div><span>MONO</span></div>
             <div class="theme-btn" id="theme-synth" onclick="setTheme('synth')"><div class="theme-swatch" style="background:#ff5ad0;"></div><span>SYNTH</span></div>
             <div class="theme-btn" id="theme-ocean" onclick="setTheme('ocean')"><div class="theme-swatch" style="background:#22d3d3;"></div><span>OCEAN</span></div>
+            <div class="theme-btn" id="theme-honeypot" onclick="setTheme('honeypot')"><div class="theme-swatch" style="background:#dc6d22;"></div><span>HONEYPOT</span></div>
           </div>
         </div>
         <div id="lang-dd">
@@ -1187,6 +1188,7 @@
         <div class="mob-theme-dot" onclick="setTheme('mono')" id="mob-t-mono" style="width:9px;height:9px;border-radius:50%;background:#e6edf2;cursor:pointer;border:1px solid transparent;"></div>
         <div class="mob-theme-dot" onclick="setTheme('synth')" id="mob-t-synth" style="width:9px;height:9px;border-radius:50%;background:#ff5ad0;cursor:pointer;border:1px solid transparent;"></div>
         <div class="mob-theme-dot" onclick="setTheme('ocean')" id="mob-t-ocean" style="width:9px;height:9px;border-radius:50%;background:#22d3d3;cursor:pointer;border:1px solid transparent;"></div>
+        <div class="mob-theme-dot" onclick="setTheme('honeypot')" id="mob-t-honeypot" style="width:9px;height:9px;border-radius:50%;background:#dc6d22;cursor:pointer;border:1px solid transparent;"></div>
         <button class="ctrl-btn csv-feed-btn" onclick="exportCSV()" style="padding:2px 5px;font-size:8px;">↓ CSV</button>
         <a href="https://github.com/s3lfcod3r/selfthreatmap" target="_blank" style="color:rgba(0,229,200,0.4);font-size:8px;text-decoration:none;">⭐</a>
       </div>
@@ -1266,6 +1268,7 @@ const localUnbanned = new Set();
 const ARC_FPS      = 30;
 let ROCKET_DURATION_MS = 3200;
 let ROCKET_STAGGER_MS = 420;
+let ROCKET_GLOBAL_GAP_MS = 367; // Mindestabstand zwischen zwei Starts (alle IPs) — ~3 Bögen je 1,1 s wie Honeypot64
 let ROCKET_TAIL_T = 0.13;
 let ROCKET_TAIL_LEGACY_T = 0.06;
 let ROCKET_TAIL_ARC_T = 0.10;
@@ -1281,7 +1284,7 @@ let FLIGHT_LABEL_THROTTLE_MS = 150;
 // Grundwerte = Profil „Standard“ (Honeypot-Bogen, Takt wie Honeypot64, siehe profiles.js)
 const MAP_SETTINGS_DEFAULTS={
   refreshMs:30000,maxActiveRockets:12,maxPendingRockets:36,maxSpawnBatch:3,
-  rocketDurationMs:3200,rocketStaggerMs:420,replayUiThrottleMs:220,flightLabelThrottleMs:150,
+  rocketDurationMs:3200,rocketStaggerMs:420,rocketGlobalGapMs:367,replayUiThrottleMs:220,flightLabelThrottleMs:150,
   rocketSpawnMode:'per_attack',maxQueuePerIp:12,
   rocketTailClassic:0.13,rocketTailLegacy:0.06,rocketTailArc:0.10,rocketLaneSpread:0,
   showFlightLabels:true,maxFlightLabels:8,replayDurationMin:3,
@@ -1321,7 +1324,13 @@ const THREAT_TYPES = {
   other:{ color:'#8a9caa', labelDe:'Sonstige', labelEn:'Other' },
 };
 function scenarioCategory(s){const x=(s||'').toLowerCase();if(/cve|exploit|sqli|rce|lfi|rfi/.test(x))return 'cve';if(/ssh|bf|brute|force|login|rdp/.test(x))return 'brute';if(/scan|probing|probe|discovery/.test(x))return 'scan';if(/http|sensitive|recon|path/.test(x))return 'recon';return 'other';}
-function scenarioColor(s){return THREAT_TYPES[scenarioCategory(s)]?.color||THREAT_TYPES.other.color;}
+// Stil „Honeypot-Bogen“ (hp64): Farben der Honeypot64-Live-Karte (Login, Exploit, Scan, Sondierung, Sonstige)
+const HP64_THREAT_COLORS = { brute:'#ff6b78', cve:'#ffa44f', scan:'#4dd4ec', recon:'#b8c0c8', other:'#74aefe' };
+function threatColor(cat){
+  if(rocketStyle==='hp64'&&HP64_THREAT_COLORS[cat])return HP64_THREAT_COLORS[cat];
+  return THREAT_TYPES[cat]?.color||THREAT_TYPES.other.color;
+}
+function scenarioColor(s){return threatColor(scenarioCategory(s));}
 function threatLabel(cat){const tr=THREAT_TYPES[cat];return tr?(currentLang==='de'?tr.labelDe:tr.labelEn):cat;}
 
 let allEvents=[],liveMode=false,replayPlaying=false,replayRangeH=48,replaySpeed=1;
@@ -1374,8 +1383,47 @@ function countryStaticFill(cc,byCo,byCoCat,maxN){
   const col=THREAT_TYPES[cat]?.color||THREAT_TYPES.other.color;
   return hexToRgba(col,0.22+r*0.42);
 }
+// Stil „Honeypot-Bogen“: graue Karte, Herkunftsländer in 5 Orange-Stufen (logarithmisch, stärkstes Land = 5)
+// — auch während der Animation; das Land des Servers leuchtet, solange ein Bogen dorthin läuft
+const HP64_LAND={land:'#2b3138',edge:'#121417',hit:'#f5d76e',m:['#4a3020','#6b3d1f','#8f4c1e','#b65c1f','#dc6d22']};
+let hp64HitOn=false,hp64HomeKey='',hp64HomeId=null;
+function hp64HomeCountryId(){
+  const key=SERVER_LAT+','+SERVER_LON;
+  if(key!==hp64HomeKey&&countriesGeo){
+    hp64HomeKey=key;
+    const f=countriesGeo.find(c=>d3.geoContains(c,[SERVER_LON,SERVER_LAT]));
+    hp64HomeId=f?String(f.id):null;
+  }
+  return hp64HomeId;
+}
+function updateCountryFillsHp64(){
+  const events=liveMode?feedData:getEventsInReplay();
+  const byId={};
+  events.forEach(e=>{const id=ISO2_NUM[e.country];if(id)byId[id]=(byId[id]||0)+1;});
+  const max=Math.max(0,...Object.values(byId));
+  const home=hp64HomeCountryId();
+  mapG.selectAll('.land')
+    .attr('stroke',HP64_LAND.edge).attr('stroke-width',0.4)
+    .attr('fill',function(d){
+      const id=String(d.id);
+      if(hp64HitOn&&id===home)return HP64_LAND.hit;
+      const n=byId[id]||0;
+      if(!n)return HP64_LAND.land;
+      const lvl=max<=1?5:Math.min(5,1+Math.floor(4.999*Math.log(n)/Math.log(max)));
+      return HP64_LAND.m[lvl-1];
+    });
+}
+function hp64SetHit(on){
+  if(on===hp64HitOn)return;
+  hp64HitOn=on;
+  if(!mapG||rocketStyle!=='hp64')return;
+  const home=hp64HomeCountryId();
+  if(home)updateCountryFillsHp64();
+}
 function updateCountryFills(){
   if(!mapG)return;
+  if(rocketStyle==='hp64'){updateCountryFillsHp64();return;}
+  mapG.selectAll('.land').attr('stroke','rgba(0,229,200,0.09)').attr('stroke-width',0.4);
   if(animOn){mapG.selectAll('.land').attr('fill','#0a1a2e');return;}
   const events=liveMode?feedData:getEventsInReplay();
   const byCo={},byCoCat={},catCount={};
@@ -1420,7 +1468,8 @@ function trimActiveRockets(){
   while(activeRockets.length>MAX_ACTIVE_ROCKETS)activeRockets.shift();
 }
 // Platz für eine neue Bahn? Sonst wartet sie in der Queue — laufende Bahnen werden nie mittendrin entfernt
-function hasRocketCapacity(){return activeRockets.length<MAX_ACTIVE_ROCKETS;}
+let nextGlobalLaunchAt=0;
+function hasRocketCapacity(){return activeRockets.length<MAX_ACTIVE_ROCKETS&&performance.now()>=nextGlobalLaunchAt;}
 function clearSpawnedRocketKeys(){spawnedRocketKeys.clear();}
 function rocketQueueKey(ev){return ev.ip||'?';}
 function canLaunchRocketNow(ip){return performance.now()>=(rocketLaunchAtByIp.get(ip)||0);}
@@ -1428,13 +1477,14 @@ function reserveRocketLaunchSlot(ip){
   const now=performance.now();
   const next=Math.max(now,rocketLaunchAtByIp.get(ip)||0);
   rocketLaunchAtByIp.set(ip,next+ROCKET_STAGGER_MS);
+  if(ROCKET_GLOBAL_GAP_MS>0)nextGlobalLaunchAt=now+ROCKET_GLOBAL_GAP_MS;
 }
 function initReplayWindow(){const times=allEvents.map(e=>e.ts).filter(t=>t>0);if(!times.length)return;replayWinEnd=Math.max(...times);replayWinStart=Math.max(Math.min(...times),replayWinEnd-replayRangeH*3600000);replayCursor=replayWinStart;lastReplaySpawnTs=replayWinStart;resetRockets();clearSpawnedRocketKeys();updateReplaySlider();}
 function getEventsInReplay(){let list=allEvents.filter(e=>e.ts>=replayWinStart&&e.ts<=replayCursor);if(activeFilters.country)list=list.filter(d=>d.country===activeFilters.country);if(activeFilters.scenario)list=list.filter(d=>d.scenario===activeFilters.scenario);if(activeFilters.search){const q=activeFilters.search;list=list.filter(d=>(d.ip||'').includes(q)||(d.country||'').toLowerCase().includes(q)||(d.scenario||'').toLowerCase().includes(q));}return list;}
 function aggregateFromEvents(events){const by={};events.forEach(e=>{if(!e.lat&&!e.lon)return;const k=`${e.lat.toFixed(2)},${e.lon.toFixed(2)},${e.scenario}`;if(!by[k])by[k]={...e,count:0};by[k].count++;});return Object.values(by);}
 function getDisplayAttackData(){return liveMode?getFilteredAttackData():aggregateFromEvents(getEventsInReplay());}
 function buildThreatLegend(){
-  const html=Object.keys(THREAT_TYPES).map(k=>`<span class="threat-leg"><span class="threat-leg-dot" style="background:${THREAT_TYPES[k].color}"></span>${threatLabel(k)}</span>`).join('');
+  const html=Object.keys(THREAT_TYPES).map(k=>`<span class="threat-leg"><span class="threat-leg-dot" style="background:${threatColor(k)}"></span>${threatLabel(k)}</span>`).join('');
   ['threat-legend','threat-legend-mob'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html;});
 }
 function getAlltimeFeedEvents(){
@@ -2279,6 +2329,7 @@ function syncSettingsToGlobals(){
   REFRESH_MS=mapSettings.refreshMs;
   ROCKET_DURATION_MS=mapSettings.rocketDurationMs;
   ROCKET_STAGGER_MS=mapSettings.rocketStaggerMs;
+  ROCKET_GLOBAL_GAP_MS=mapSettings.rocketGlobalGapMs??0;
   MAX_ACTIVE_ROCKETS=mapSettings.maxActiveRockets;
   MAX_PENDING_ROCKETS=mapSettings.maxPendingRockets;
   MAX_ROCKET_SPAWN_BATCH=mapSettings.maxSpawnBatch;

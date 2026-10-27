@@ -206,6 +206,7 @@ const THEMES={
   mono:  {accent:'#e6edf2',danger:'#ff5a5a',warn:'#d0d6db',ok:'#9aa6ae',dim:'rgba(200,210,220,0.16)',text:'#dfe6ea',server:'#bcc6cd',bg:'#0c0e10'},
   synth: {accent:'#ff5ad0',danger:'#ff3d6a',warn:'#ffb000',ok:'#3fe0ff',dim:'rgba(255,90,200,0.20)',text:'#ffd8f0',server:'#7a6aff',bg:'#0d0a1a'},
   ocean: {accent:'#22d3d3',danger:'#ff6a6a',warn:'#ffb000',ok:'#3fb9a0',dim:'rgba(80,180,200,0.20)',text:'#cfeefb',server:'#4ad0e0',bg:'#06121a'},
+  honeypot:{accent:'#dc6d22',danger:'#ff6b78',warn:'#ffa44f',ok:'#4dd4ec',dim:'rgba(220,109,34,0.18)',text:'#e9ecef',server:'#f5d76e',bg:'#161a1f'},
 };
 let currentTheme='cyan';
 

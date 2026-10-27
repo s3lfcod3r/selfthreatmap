@@ -24,6 +24,14 @@ function rsSeg(ctx,r,a,b,steps,col,w,alpha,dash){
 }
 function rsDot(ctx,x,y,rad,col,alpha){ctx.beginPath();ctx.fillStyle=col;ctx.globalAlpha=alpha;ctx.arc(x,y,rad,0,Math.PI*2);ctx.fill();}
 function rsRing(ctx,x,y,rad,col,w,alpha){ctx.beginPath();ctx.strokeStyle=col;ctx.lineWidth=w;ctx.globalAlpha=alpha;ctx.arc(x,y,rad,0,Math.PI*2);ctx.stroke();}
+// CSS-„ease-out“ = cubic-bezier(0,0,0.58,1): x(s) nach s auflösen (Newton), dann y(s)
+function rsEaseOut(t){
+  if(t<=0)return 0;if(t>=1)return 1;
+  const bx=s=>3*(1-s)*s*s*0.58+s*s*s, by=s=>3*(1-s)*s*s+s*s*s;
+  let s=t;
+  for(let i=0;i<6;i++){const dx=(bx(s+1e-4)-bx(s))/1e-4;if(!dx)break;s-=(bx(s)-t)/dx;s=s<0?0:s>1?1:s;}
+  return by(s);
+}
 function rsHead(ctx,p,col,ik,lite,rad){ctx.beginPath();ctx.fillStyle='#fffefb';ctx.globalAlpha=1;if(!lite){ctx.shadowColor=hexToRgba(col,0.9);ctx.shadowBlur=5*ik;}ctx.arc(p.x,p.y,(rad||2.3)*ik,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;}
 
 /* ---- Die 30 Drawer ----------------------------------------- */
@@ -198,18 +206,21 @@ const ROCKET_DRAWERS = {
     rsSeg(ctx,r,0,t,16,col,1.8*ik,fl,[3*ik,2*ik]);
     rsDot(ctx,rsQp(r,t).x,rsQp(r,t).y,2.2*ik,col,fl);
   },
-  // 31 — Honeypot-Bogen (Standard, wie die Honeypot64-Live-Karte): Bogen zeichnet sich in den
-  // ersten 55 % der Flugzeit von der Quelle zum Ziel (ease-out), steht kurz und blendet dann aus;
-  // Punkt an der Quelle, pulsierender Ring am Ziel
+  // 31 — Honeypot-Bogen (Standard, wie die Honeypot64-Live-Karte): ease-out über die ganze Flugzeit;
+  // bis 55 % zeichnet sich der Bogen von der Quelle zum Ziel, danach blendet er aus. Punkt an der
+  // Quelle und Puls-Ring am Ziel (2 s, 0,6×→3×) bleiben bis zum Ende; Wiederholungen dünner und blasser
   hp64(ctx,r,t,col,ik,lite){
-    const d=Math.min(1,t/0.55),draw=1-Math.pow(1-d,3);
-    const fade=t<0.55?1:Math.max(0,1-(t-0.55)/0.45);
+    const p=rsEaseOut(t);
+    const draw=Math.min(1,p/0.55);
+    let alpha=p<0.55?1:Math.max(0,1-(p-0.55)/0.45);
+    if(r.rep)alpha*=0.7;
     if(!lite){ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=1.5*ik;}
-    rsSeg(ctx,r,0,draw,24,col,2.4*ik,fade);
+    rsSeg(ctx,r,0,draw,28,col,(r.rep?1.8:2.4)*ik,alpha);
     ctx.shadowBlur=0;
-    rsDot(ctx,r.sx,r.sy,2.2*ik,col,fade);
-    const ph=(performance.now()/2000)%1;
-    rsRing(ctx,r.ex,r.ey,(4+ph*6)*ik,col,1*ik,(1-ph)*fade);
+    rsDot(ctx,r.sx,r.sy,2.2*ik,col,1);
+    rsRing(ctx,r.sx,r.sy,2.2*ik,'#121417',0.6*ik,1);
+    const ph=(((performance.now()-(r.born||0))%2000)+2000)%2000/2000;
+    rsRing(ctx,r.ex,r.ey,4*(0.6+2.4*ph)*ik,HP64_THREAT_COLORS.brute,1*ik,0.9*(1-ph));
   },
 };
 

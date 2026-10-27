@@ -1,17 +1,19 @@
-function launchRocketFromEvent(ev){
+function launchRocketFromEvent(ev,rep){
   const ip=rocketQueueKey(ev);
   const [sx,sy]=proj([SERVER_LON,SERVER_LAT]);const pt=proj([ev.lon,ev.lat]);
   if(!pt){drainRocketQueue(ip);return;}
   const[px,py]=pt;const dx=sx-px,dy=sy-py,dist=Math.max(Math.sqrt(dx*dx+dy*dy),1);
   const nx=-dy/dist,ny=dx/dist;
   const lane=(((++rocketIdSeq)%5)-2)*ROCKET_LANE_SPREAD;
-  const arcLift=Math.min(dist*0.38,130);
+  // Honeypot-Bogen: Bogenhöhe wie Honeypot64 (35 % der Strecke, mind. 18 von 1000 Kartenbreite, ohne Deckel)
+  const arcLift=rocketStyle==='hp64'?Math.max(18*W/1000,dist*0.35):Math.min(dist*0.38,130);
+  if(!rep)lastFreshRocketTs=performance.now();
   activeRockets.push({
     id:rocketIdSeq,
     queueIp:ip,ip:ev.ip,country:ev.country||'??',city:ev.city||'',scenario:ev.scenario,
     sx:px,sy:py,ex:sx,ey:sy,
     cpx:(px+sx)/2+nx*lane,cpy:(py+sy)/2-arcLift+ny*lane,
-    col:scenarioColor(ev.scenario),t:0,
+    col:scenarioColor(ev.scenario),t:0,born:performance.now(),rep:!!rep,
   });
   trimActiveRockets();
   if(!animRAF)startAnimLoop();
@@ -193,8 +195,7 @@ function drawCrowdSecRockets(ts){
   }
   if(!animOn){clearFlightLabels();return;}
   drainAllRocketQueues();
-  if(!activeRockets.length&&!pendingRocketsByIp.size){clearFlightLabels();return;}
-  if(!activeRockets.length){clearFlightLabels();return;}
+  if(!activeRockets.length){if(typeof hp64SetHit==='function')hp64SetHit(false);clearFlightLabels();return;}
   const now=typeof ts==='number'?ts:performance.now();
   const dt=lastRocketDrawTs?Math.min(48,now-lastRocketDrawTs):16;
   lastRocketDrawTs=now;
@@ -207,13 +208,14 @@ function drawCrowdSecRockets(ts){
     const pt=quadPoint(r,r.t);
     const col=r.col||scenarioColor(r.scenario);
     if(r.t<1)drawRocketForStyle(ctx2d,r,r.t,col,ik,rocketLite);
-    if(r.t>=0.92){
+    if(r.t>=0.92&&rocketStyle!=='hp64'){
       const flash=Math.min(1,(r.t-0.92)/0.08);
       ctx2d.beginPath();ctx2d.fillStyle=col;ctx2d.globalAlpha=0.45*(1-flash);
       ctx2d.arc(r.ex,r.ey,2.5*ik,0,Math.PI*2);ctx2d.fill();
     }
     return r.t<1; // fertige Bahnen raus (t ist auf 1 begrenzt — 1.02 wurde nie erreicht)
   });
+  if(typeof hp64SetHit==='function')hp64SetHit(activeRockets.length>0);
   drainAllRocketQueues();
   if(now-lastFlightLabelTs>=FLIGHT_LABEL_THROTTLE_MS){
     lastFlightLabelTs=now;
@@ -279,3 +281,25 @@ function startAnimLoop(){
   animRAF=requestAnimationFrame(loop);
 }
 function startReplayLoop(){replayPlaying=true;updateReplayControlsUI();startAnimLoop();}
+
+/* Honeypot-Bogen im Live-Modus: kommt in einem Takt (1,1 s) nichts Neues, werden 1–2 ältere Angriffe
+   (letzte Stunde, sonst die neuesten 50) blasser wiederholt — verschiedene Verbindungen, reihum */
+let lastFreshRocketTs=0,hp64ReplayIdx=0;
+function hp64ReplayTick(){
+  if(rocketStyle!=='hp64'||!liveMode||!animOn||!linesOn||document.hidden||!proj)return;
+  if(performance.now()-lastFreshRocketTs<1100||pendingRocketsByIp.size)return;
+  const hourAgo=Date.now()-3600000;
+  let pool=feedData.filter(e=>e.ts>=hourAgo&&e.lat&&e.lon);
+  if(!pool.length)pool=feedData.filter(e=>e.lat&&e.lon).slice(0,50);
+  if(!pool.length)return;
+  let room=Math.min(MAX_ACTIVE_ROCKETS-activeRockets.length,Math.random()<0.5?1:2);
+  const used={};let n=0;
+  for(let tries=0;room>0&&tries<Math.min(pool.length,20);tries++){
+    const e=pool[hp64ReplayIdx++%pool.length];
+    if(used[e.country])continue;
+    used[e.country]=true;
+    setTimeout(()=>{if(hasRocketCapacity())launchRocketFromEvent(e,true);},n++*300);
+    room--;
+  }
+}
+setInterval(hp64ReplayTick,1100);

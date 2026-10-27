@@ -20,14 +20,14 @@ const STM_DENS = {
   ultra:  { maxActiveRockets:220, maxSpawnBatch:60, maxPendingRockets:520 },
 };
 
-// Takt der Honeypot64-Live-Karte: höchstens 12 Bögen gleichzeitig, 3 neue je Takt,
+// Takt der Honeypot64-Live-Karte: höchstens 12 Bögen gleichzeitig, ~3 je 1,1 s nacheinander,
 // 3,2 s je Bogen, keine parallelen Bahnen (auch Grundwerte in MAP_SETTINGS_DEFAULTS)
-const STM_HP64 = { ...STM_DENS.ruhig, maxSpawnBatch:3, rocketDurationMs:3200, rocketLaneSpread:0 };
+const STM_HP64 = { ...STM_DENS.ruhig, maxSpawnBatch:3, rocketDurationMs:3200, rocketLaneSpread:0, rocketGlobalGapMs:367 };
 
 const PROFILES = [
   // ── Grund-Modi ────────────────────────────────────────────
   {id:'standard', g:'Grund-Modi', n:'Standard', d:'Wie die Honeypot64-Live-Karte — Bögen zeichnen sich zum Ziel und blenden aus, ruhiges Tempo.',
-    s:{style:'hp64', anim:true, lines:true, spawn:'per_attack', map:STM_HP64}},
+    s:{style:'hp64', theme:'honeypot', anim:true, lines:true, spawn:'per_attack', map:STM_HP64}},
   {id:'raketen-standard', g:'Grund-Modi', n:'Raketen (bisheriger Standard)', d:'Ausgewogen — Raketen, Animation an, jeder Angriff.',
     s:{style:'rakete', anim:true, lines:true, spawn:'per_attack', map:{...STM_DENS.mittel, rocketDurationMs:4500}}},
   {id:'console-alle', g:'Grund-Modi', n:'Alle Angriffe (Console)', d:'Gestrichelte Bögen für jeden Angriff — der klassische CrowdSec-Look.',
@@ -157,7 +157,7 @@ function applyProfile(id){
   if(!p) return;
   const s = p.s || {};
   const BASE = { maxActiveRockets:28, maxSpawnBatch:14, maxPendingRockets:64,
-    rocketDurationMs:4500, rocketStaggerMs:420, maxConsoleArcs:150,
+    rocketDurationMs:4500, rocketStaggerMs:420, rocketGlobalGapMs:0, maxConsoleArcs:150,
     rocketTailClassic:0.13, rocketLaneSpread:12, refreshMs:30000 };
   if(typeof mapSettings!=='undefined'){
     Object.assign(mapSettings, BASE, s.map||{});
@@ -180,6 +180,9 @@ function applyProfile(id){
   if(typeof fillSettingsForm==='function') fillSettingsForm();
   if(typeof syncMapToggleStates==='function') syncMapToggleStates();
   if(typeof restartFetchLoop==='function') restartFetchLoop();
+  // Farben (Legende, Länderflächen) hängen beim Honeypot-Bogen vom Stil ab
+  if(typeof buildThreatLegend==='function') buildThreatLegend();
+  if(typeof updateCountryFills==='function') updateCountryFills();
   if(typeof dotG!=='undefined' && dotG){
     if(typeof drawServerDots==='function') drawServerDots();
     if(typeof renderDots==='function') renderDots();
