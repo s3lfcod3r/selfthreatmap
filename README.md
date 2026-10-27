@@ -41,7 +41,7 @@ Part of the **Self** family (SelfMailer, SelfStream, SelfArchiver, SelfDashboard
 
 **🌍 Map**
 - **Interactive world map** with animated attack paths (D3.js) — all attack points visible on load
-- **30+ flight-path styles** — rocket (default), comet, laser, particle stream, arcs, impact rings and more
+- **30+ flight-path styles** — Honeypot arc (default, like the Honeypot64 live map), rocket, comet, laser, particle stream, arcs, impact rings and more
 - **50+ one-click profiles** — presets bundling style + theme + animation + density + mode (e.g. "All attacks (console)", "Static heatmap", "Comet rain", "Matrix mode", "Brute-force hunt"); your pick is **remembered across reloads**
 - **Attack-origin views** — "Countries" opens a ranked list of every country (+ top cities) you were attacked from; the "ORIGINS" toggle plots every origin as a point, coloured by count, with collision-free labels (country names zoomed out, city names zoomed in), live
 - **Auto-fit zoom**, city names visible all the way in (up to 25×)
@@ -231,7 +231,7 @@ Teil der **Self**-Familie (SelfMailer, SelfStream, SelfArchiver, SelfDashboard �
 
 **🌍 Karte**
 - **Interaktive Weltkarte** mit animierten Angriffsbahnen (D3.js) — beim Laden alle Angriffspunkte sichtbar
-- **Über 30 Bahn-Stile** — Rakete (Standard), Komet, Laser, Partikel-Strom, Bögen, Einschlag-Ringe u. v. m.
+- **Über 30 Bahn-Stile** — Honeypot-Bogen (Standard, wie die Honeypot64-Live-Karte), Rakete, Komet, Laser, Partikel-Strom, Bögen, Einschlag-Ringe u. v. m.
 - **50+ Ein-Klick-Profile** — Voreinstellungen, die Stil + Theme + Animation + Dichte + Modus bündeln (z. B. „Alle Angriffe (Console)“, „Heatmap pur“, „Kometen-Regen“, „Matrix-Modus“, „Brute-Force-Jagd“); die Wahl **bleibt nach dem Neuladen erhalten**
 - **Herkünfte-Ansichten** — „LÄNDER“ öffnet die Rangliste aller Länder (+ Top-Städte), aus denen du angegriffen wurdest; der Schalter „HERKÜNFTE“ zeigt jeden Herkunftsort als Punkt, nach Anzahl gefärbt, mit überlappungsfreien Beschriftungen (Länder herausgezoomt, Städte beim Reinzoomen), live
 - **Auto-Fit-Zoom**, Stadtnamen bis ganz nah sichtbar (bis 25×)

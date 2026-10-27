@@ -1264,29 +1264,30 @@ const APP_VERSION  = 'v3.1.0';
 let REFRESH_MS   = 30000;
 const localUnbanned = new Set();
 const ARC_FPS      = 30;
-let ROCKET_DURATION_MS = 4500;
+let ROCKET_DURATION_MS = 3200;
 let ROCKET_STAGGER_MS = 420;
 let ROCKET_TAIL_T = 0.13;
 let ROCKET_TAIL_LEGACY_T = 0.06;
 let ROCKET_TAIL_ARC_T = 0.10;
 const ROCKET_STYLE_STORAGE_KEY = 'csThreatMapRocketStyle';
 const MAP_SETTINGS_STORAGE_KEY = 'csThreatMapSettings';
-let ROCKET_LANE_SPREAD = 12;
+let ROCKET_LANE_SPREAD = 0;
 let REPLAY_PLAY_MS = 180000;
-let MAX_ACTIVE_ROCKETS = 28;
-let MAX_PENDING_ROCKETS = 64;
-let MAX_ROCKET_SPAWN_BATCH = 14;
+let MAX_ACTIVE_ROCKETS = 12;
+let MAX_PENDING_ROCKETS = 36;
+let MAX_ROCKET_SPAWN_BATCH = 3;
 let REPLAY_UI_THROTTLE_MS = 220;
 let FLIGHT_LABEL_THROTTLE_MS = 150;
+// Grundwerte = Profil „Standard“ (Honeypot-Bogen, Takt wie Honeypot64, siehe profiles.js)
 const MAP_SETTINGS_DEFAULTS={
-  refreshMs:30000,maxActiveRockets:28,maxPendingRockets:64,maxSpawnBatch:14,
-  rocketDurationMs:4500,rocketStaggerMs:420,replayUiThrottleMs:220,flightLabelThrottleMs:150,
+  refreshMs:30000,maxActiveRockets:12,maxPendingRockets:36,maxSpawnBatch:3,
+  rocketDurationMs:3200,rocketStaggerMs:420,replayUiThrottleMs:220,flightLabelThrottleMs:150,
   rocketSpawnMode:'per_attack',maxQueuePerIp:12,
-  rocketTailClassic:0.13,rocketTailLegacy:0.06,rocketTailArc:0.10,rocketLaneSpread:12,
+  rocketTailClassic:0.13,rocketTailLegacy:0.06,rocketTailArc:0.10,rocketLaneSpread:0,
   showFlightLabels:true,maxFlightLabels:8,replayDurationMin:3,
   maxConsoleArcs:150,
   cityZoomMin:2,cityZoomMax:25,
-  rocketStyle:'rakete',
+  rocketStyle:'hp64',
   overrideCoords:false,serverLat:'',serverLon:'',serverName:'',
 };
 let mapSettings={...MAP_SETTINGS_DEFAULTS};
@@ -1301,7 +1302,7 @@ const HOME_SCREEN_X_FRAC = 0.48;  // Server horizontal im sichtbaren Kartenberei
 const HOME_SCREEN_Y_FRAC = 0.28;  // Server höher → Weltkarte füllt Bereich bis zum Logo
 const HOME_PROJ_Y_SHIFT = 0.11;   // Projektion nach oben
 const HOME_TY_NUDGE_PX = 42;      // zusätzlich Karte nach oben schieben
-let rocketStyle='rakete'; // siehe rocket-styles.js (ROCKET_STYLE_IDS) — Standard: Rakete
+let rocketStyle='hp64'; // siehe rocket-styles.js (ROCKET_STYLE_IDS) — Standard: Honeypot-Bogen
 const MAP_VIEW_STORAGE_KEY = 'csThreatMapViewPrefs';
 const SHOW_OWN_IP_STORAGE_KEY = 'csThreatMapShowOwnIp';
 const ZOOM_STEP = 0.1;          // +/- Buttons
@@ -2381,7 +2382,7 @@ function readSettingsForm(){
     replayDurationMin:clampNum(set('set-replay-min')?.value,1,30,3),
     rocketSpawnMode:['per_attack','per_ip_time','per_ip'].includes(set('set-spawn-mode')?.value)?set('set-spawn-mode').value:'per_attack',
     maxQueuePerIp:clampNum(set('set-queue-ip')?.value,1,50,12),
-    rocketStyle:(typeof ROCKET_STYLE_IDS==='undefined'?['classic','legacy','arc']:ROCKET_STYLE_IDS).includes(set('set-rocket-style')?.value)?set('set-rocket-style').value:'rakete',
+    rocketStyle:(typeof ROCKET_STYLE_IDS==='undefined'?['classic','legacy','arc']:ROCKET_STYLE_IDS).includes(set('set-rocket-style')?.value)?set('set-rocket-style').value:'hp64',
     rocketTailClassic:clampNum(set('set-tail-classic')?.value,4,25,13)/100,
     rocketTailLegacy:mapSettings.rocketTailLegacy??0.06,
     rocketLaneSpread:clampNum(set('set-lane-spread')?.value,0,30,12),
@@ -2414,7 +2415,7 @@ function closeSettingsModal(){
 }
 function saveSettingsFromForm(){
   mapSettings=readSettingsForm();
-  rocketStyle=mapSettings.rocketStyle||'rakete';
+  rocketStyle=mapSettings.rocketStyle||'hp64';
   persistMapSettings();
   persistRocketStylePrefs();
   syncSettingsToGlobals();
@@ -2469,9 +2470,11 @@ function syncSettingsModalLang(){
   }
   const rs=document.getElementById('set-rocket-style');
   if(rs&&l.rocket_style_new){
-    rs.options[0].text=l.rocket_style_new;
-    if(rs.options[1])rs.options[1].text=l.rocket_style_arc||'Klassisch';
-    if(rs.options[2])rs.options[2].text=l.rocket_style_legacy||'Minimal';
+    // nach Wert, nicht nach Position — der Katalog (rocket-styles.js) stellt andere Stile davor
+    const opt=v=>[...rs.options].find(o=>o.value===v);
+    if(opt('classic'))opt('classic').text=l.rocket_style_new;
+    if(opt('arc'))opt('arc').text=l.rocket_style_arc||'Klassisch';
+    if(opt('legacy'))opt('legacy').text=l.rocket_style_legacy||'Minimal';
   }
   updateSpawnModeHint();
   set('set-lbl-refresh','set_refresh');

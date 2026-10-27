@@ -20,9 +20,15 @@ const STM_DENS = {
   ultra:  { maxActiveRockets:220, maxSpawnBatch:60, maxPendingRockets:520 },
 };
 
+// Takt der Honeypot64-Live-Karte: höchstens 12 Bögen gleichzeitig, 3 neue je Takt,
+// 3,2 s je Bogen, keine parallelen Bahnen (auch Grundwerte in MAP_SETTINGS_DEFAULTS)
+const STM_HP64 = { ...STM_DENS.ruhig, maxSpawnBatch:3, rocketDurationMs:3200, rocketLaneSpread:0 };
+
 const PROFILES = [
   // ── Grund-Modi ────────────────────────────────────────────
-  {id:'standard', g:'Grund-Modi', n:'Standard', d:'Ausgewogen — Raketen, Animation an, jeder Angriff.',
+  {id:'standard', g:'Grund-Modi', n:'Standard', d:'Wie die Honeypot64-Live-Karte — Bögen zeichnen sich zum Ziel und blenden aus, ruhiges Tempo.',
+    s:{style:'hp64', anim:true, lines:true, spawn:'per_attack', map:STM_HP64}},
+  {id:'raketen-standard', g:'Grund-Modi', n:'Raketen (bisheriger Standard)', d:'Ausgewogen — Raketen, Animation an, jeder Angriff.',
     s:{style:'rakete', anim:true, lines:true, spawn:'per_attack', map:{...STM_DENS.mittel, rocketDurationMs:4500}}},
   {id:'console-alle', g:'Grund-Modi', n:'Alle Angriffe (Console)', d:'Gestrichelte Bögen für jeden Angriff — der klassische CrowdSec-Look.',
     s:{style:'arc', anim:true, lines:true, map:{maxConsoleArcs:300}}},
@@ -214,8 +220,14 @@ document.addEventListener('click', function(e){ const dd=document.getElementById
 
 /* Gespeicherte Profil-Auswahl beim Start wiederherstellen */
 function restoreProfileSelection(){
-  let saved=''; try{ saved=localStorage.getItem('stmProfile')||''; }catch(e){}
+  let saved='', custom=false;
+  try{
+    saved=localStorage.getItem('stmProfile')||'';
+    custom=!!localStorage.getItem('csThreatMapSettings');
+  }catch(e){}
   if(saved && PROFILES.some(p=>p.id===saved)) currentProfile = saved;
+  // Ohne gespeichertes Profil und ohne eigene Einstellungen gelten die Grundwerte = Profil „Standard“
+  else if(!custom) currentProfile = 'standard';
 }
 
 /* Selbst-Init (unabhängig von app.js) — wie beim Raketen-Stil-Select */

@@ -1,6 +1,6 @@
 /* ============================================================
    SelfThreatMap — Bahn-Stile ("Raketen")
-   30 umschaltbare Flugbahn-Stile für Angriffe (Quelle → Home).
+   31 umschaltbare Flugbahn-Stile für Angriffe (Quelle → Home).
    Jeder Drawer zeichnet auf das bereits transformierte 2D-Canvas
    (Aufrufer hat translate+scale gesetzt). ik = 1/scale (Screen-px).
    Pfad pro Rakete: quadratische Bézier über quadPoint(r,u).
@@ -28,7 +28,7 @@ function rsHead(ctx,p,col,ik,lite,rad){ctx.beginPath();ctx.fillStyle='#fffefb';c
 
 /* ---- Die 30 Drawer ----------------------------------------- */
 const ROCKET_DRAWERS = {
-  // 1 — Rakete (Standard): Düse + Spitze + kurzer Schweif
+  // 1 — Rakete: Düse + Spitze + kurzer Schweif
   rakete(ctx,r,t,col,ik,lite){
     rsSeg(ctx,r,t-0.12,t,5,col,2.4*ik,0.85);
     const p=rsQp(r,t),a=rsAng(r,t);
@@ -198,12 +198,28 @@ const ROCKET_DRAWERS = {
     rsSeg(ctx,r,0,t,16,col,1.8*ik,fl,[3*ik,2*ik]);
     rsDot(ctx,rsQp(r,t).x,rsQp(r,t).y,2.2*ik,col,fl);
   },
+  // 31 — Honeypot-Bogen (Standard, wie die Honeypot64-Live-Karte): Bogen zeichnet sich in den
+  // ersten 55 % der Flugzeit von der Quelle zum Ziel (ease-out), steht kurz und blendet dann aus;
+  // Punkt an der Quelle, pulsierender Ring am Ziel
+  hp64(ctx,r,t,col,ik,lite){
+    const d=Math.min(1,t/0.55),draw=1-Math.pow(1-d,3);
+    const fade=t<0.55?1:Math.max(0,1-(t-0.55)/0.45);
+    if(!lite){ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=1.5*ik;}
+    rsSeg(ctx,r,0,draw,24,col,2.4*ik,fade);
+    ctx.shadowBlur=0;
+    rsDot(ctx,r.sx,r.sy,2.2*ik,col,fade);
+    const ph=(performance.now()/2000)%1;
+    rsRing(ctx,r.ex,r.ey,(4+ph*6)*ik,col,1*ik,(1-ph)*fade);
+  },
 };
 
 /* ---- Katalog (für Dropdown + Validierung) ------------------ */
 const ROCKET_STYLE_CATALOG = [
+  {group:{de:'Standard',en:'Default'}, items:[
+    ['hp64',{de:'Honeypot-Bogen (Standard)',en:'Honeypot arc (default)'}],
+  ]},
   {group:{de:'Raketen',en:'Rockets'}, items:[
-    ['rakete',{de:'Rakete (Standard)',en:'Rocket (default)'}],
+    ['rakete',{de:'Rakete',en:'Rocket'}],
     ['doppelrakete',{de:'Doppel-Rakete',en:'Twin rocket'}],
     ['pfeil',{de:'Pfeil',en:'Arrow'}],
     ['paket',{de:'Datenpaket',en:'Data packet'}],
@@ -256,7 +272,7 @@ function populateRocketStyleSelect(){
   const sel=document.getElementById('set-rocket-style');
   if(!sel)return;
   const lang=(typeof currentLang!=='undefined'&&currentLang==='en')?'en':'de';
-  const cur=sel.value||(typeof rocketStyle!=='undefined'?rocketStyle:'rakete');
+  const cur=sel.value||(typeof rocketStyle!=='undefined'?rocketStyle:'hp64');
   sel.innerHTML='';
   ROCKET_STYLE_CATALOG.forEach(g=>{
     const og=document.createElement('optgroup');
@@ -285,7 +301,7 @@ function _rsPrevDraw(){
     var ctx=cv.getContext('2d'),r=_rsPrevR;
     ctx.clearRect(0,0,cv.width,cv.height);
     var sel=document.getElementById('set-rocket-style');
-    var style=sel?sel.value:'rakete',col=_rsAccent();
+    var style=sel?sel.value:'hp64',col=_rsAccent();
     rsSeg(ctx,r,0,1,26,col,1.2,0.14);               // Flugbahn schwach
     rsDot(ctx,r.sx,r.sy,3,col,0.9);                  // Quelle
     var hp=(performance.now()/700)%1;                // Ziel-Puls
