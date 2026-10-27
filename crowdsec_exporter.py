@@ -24,6 +24,8 @@ CROWDSEC_LAPI_URL        = os.environ.get("CROWDSEC_LAPI_URL", "http://crowdsec:
 CROWDSEC_LAPI_MACHINE_ID = os.environ.get("CROWDSEC_LAPI_MACHINE_ID", "").strip()
 CROWDSEC_LAPI_PASSWORD   = os.environ.get("CROWDSEC_LAPI_PASSWORD", "")
 LAPI_TOKEN_TTL = 1800  # JWT gilt bei CrowdSec 1h — nach 30 min neu anmelden
+# CrowdSec 1.8 lehnt Maschinen-Logins ohne User-Agent der Form "name/version" ab
+LAPI_USER_AGENT = "selfthreatmap/3.1.0"
 # Unban-Autorisierung läuft über die Login-Session (siehe auth.py),
 # nicht über ein statisches API-Token.
 
@@ -44,7 +46,7 @@ def _lapi_request(method, path, body=None, token=None, timeout=10):
     """Ein LAPI-Request → (HTTP-Status, JSON-Antwort). Netzfehler → LapiError."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(CROWDSEC_LAPI_URL + path, data=data, method=method)
-    req.add_header("User-Agent", "selfthreatmap")
+    req.add_header("User-Agent", LAPI_USER_AGENT)
     if data is not None:
         req.add_header("Content-Type", "application/json")
     if token:
