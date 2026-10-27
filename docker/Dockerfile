@@ -3,12 +3,12 @@ FROM python:3.12-alpine
 # UTF-8 erzwingen — Emoji-Logs duerfen Request-Handler nie crashen
 ENV PYTHONUTF8=1 PYTHONIOENCODING=utf-8
 
-LABEL org.opencontainers.image.title="CrowdSec Threat Map"
+LABEL org.opencontainers.image.title="SelfThreatMap"
 LABEL org.opencontainers.image.description="Echtzeit-Angriffskarte fuer CrowdSec"
 LABEL org.opencontainers.image.source="https://github.com/s3lfcod3r/selfthreatmap"
-LABEL org.opencontainers.image.licenses="GPL-3.0-or-later"
+LABEL org.opencontainers.image.licenses="LicenseRef-Proprietary"
 LABEL org.opencontainers.image.authors="s3lfcod3r"
-LABEL org.opencontainers.image.version="2.9.1"
+LABEL org.opencontainers.image.version="3.0.0"
 
 # nginx (inkl. auth_request-Modul) fuer Dashboard + docker-cli fuer Unban
 RUN apk add --no-cache nginx docker-cli curl

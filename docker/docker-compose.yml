@@ -29,10 +29,6 @@ services:
       #     Wer Unban nicht braucht: diese Zeile entfernen.
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-      # OPTIONAL: Live-Firewall-Drops — Verzeichnis mit drops.jsonl einbinden
-      # Nur nötig wenn DROPS_ENABLED=true (siehe unten)
-      # - /EUER-PFAD/drops:/crowdsec/drops:ro
-
     environment:
       # ──────────────────────────────────────────────
       # ⚠️  PFLICHT: Server-Koordinaten eintragen
@@ -70,13 +66,6 @@ services:
       # - COOKIE_SECURE=true
       # Zugang komplett ohne Login (NUR vertrauenswürdiges LAN!):
       # - AUTH_ENABLED=false
-
-      # OPTIONAL: Live-Firewall-Drops (/drops-API). Standard: aus.
-      # Braucht eine gemountete JSONL-Datei (eine Zeile = ein verworfenes Paket).
-      # - DROPS_ENABLED=true
-      # - DROPS_LOG_PATH=/crowdsec/drops/drops.jsonl
-      # - DROPS_MAX_EVENTS=200
-      # - DROPS_MAX_AGE_SECONDS=3600
 
     # Docker-Gruppe für Socket-Zugriff (Unban + Whitelist-Restart)
     # GID anpassen falls nötig: getent group docker | cut -d: -f3

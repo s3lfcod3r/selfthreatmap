@@ -5,7 +5,7 @@
 **Live attack map straight from your local CrowdSec database.**<br>
 *Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank.*
 
-![Version](https://img.shields.io/badge/version-2.9.1-33A78C)
+![Version](https://img.shields.io/badge/version-3.0.0-33A78C)
 [![License](https://img.shields.io/badge/license-All%20rights%20reserved-8A9CAA)](LICENSE)
 ![Backend](https://img.shields.io/badge/backend-Python%203.12-1F7763)
 ![Web](https://img.shields.io/badge/web-D3.js-43D3AD)
@@ -54,7 +54,6 @@ Part of the **Self** family (SelfMailer, SelfStream, SelfArchiver, SelfDashboard
 - **Sparkline**, top 10, live feed with pagination and **CSV export**
 - IP lookups (CrowdSec CTI, Shodan, Censys, RIPE, RIPEstat, Criminal IP) from the context menu
 - **Dynamic IP whitelist** — whitelists your own changing public IP every 15 min (no self-ban)
-- Optional **live firewall drops** API (`/drops`)
 
 **🎨 Platform**
 - **12 European languages** (DE, EN, FR, ES, IT, PT, NL, PL, SV, DA, CS, EL) with in-app flag dropdown, remembered in the browser · fully responsive
@@ -83,7 +82,7 @@ The signature feature: how each attack travels from its origin to your server. P
 ```text
 Browser ──▶ nginx :8080 ──┬─ /auth/*, login, setup, settings ──▶ auth.py (/config/auth.json)
                           ├─ / (dashboard, protected via auth_request)
-                          └─ /metrics, /unban, /whitelist-status, /drops
+                          └─ /metrics, /unban, /whitelist-status
                                           │
                                           ▼
                           crowdsec_exporter.py (127.0.0.1:9456)
@@ -153,8 +152,6 @@ Environment variables (no common prefix).
 | `CONFIG_DIR` | – | `/config` | Where account + 2FA data is stored |
 | `SESSION_TTL` | – | `86400` | Session lifetime (s) |
 | `LOGIN_MAX_FAILS` / `LOGIN_LOCKOUT_SECONDS` | – | `5` / `900` | Lockout after failed logins |
-| `DROPS_ENABLED` | – | `false` | Live firewall drops API (needs a mounted `drops.jsonl`) |
-| `DROPS_LOG_PATH` / `DROPS_MAX_EVENTS` / `DROPS_MAX_AGE_SECONDS` | – | `/crowdsec/drops/drops.jsonl` / `200` / `3600` | Drops source and limits |
 
 <a id="en-security"></a>
 
@@ -200,7 +197,6 @@ Style engine: [`assets/js/rocket-styles.js`](assets/js/rocket-styles.js) · prof
 - [x] Attack-origin views, 12 languages, offline bundle
 - [x] Login + optional 2FA, security hardening
 - [x] Fast MMDB reader with IP cache and background refresh
-- [ ] Visual panel for live firewall drops
 - [ ] Test the 2.9.1 UI in the browser
 
 <p align="right"><a href="#-english">⬆ back to top</a></p>
@@ -242,7 +238,6 @@ Teil der **Self**-Familie (SelfMailer, SelfStream, SelfArchiver, SelfDashboard �
 - **Sparkline**, Top 10, Live-Feed mit Seiten und **CSV-Export**
 - IP-Abfragen (CrowdSec CTI, Shodan, Censys, RIPE, RIPEstat, Criminal IP) aus dem Kontextmenü
 - **Dynamische IP-Whitelist** — setzt deine eigene wechselnde öffentliche IP alle 15 Min auf die Whitelist (kein Selbst-Ban)
-- Optionale **Live-Firewall-Drops**-API (`/drops`)
 
 **🎨 Plattform**
 - **12 europäische Sprachen** (DE, EN, FR, ES, IT, PT, NL, PL, SV, DA, CS, EL) mit Flaggen-Auswahl in der App, im Browser gemerkt · voll responsive
@@ -271,7 +266,7 @@ Das Herzstück: wie jeder Angriff von der Quelle zu deinem Server fliegt. **Übe
 ```text
 Browser ──▶ nginx :8080 ──┬─ /auth/*, Login, Einrichtung, Einstellungen ──▶ auth.py (/config/auth.json)
                           ├─ / (Dashboard, geschützt per auth_request)
-                          └─ /metrics, /unban, /whitelist-status, /drops
+                          └─ /metrics, /unban, /whitelist-status
                                           │
                                           ▼
                           crowdsec_exporter.py (127.0.0.1:9456)
@@ -341,8 +336,6 @@ Umgebungsvariablen (ohne gemeinsames Präfix).
 | `CONFIG_DIR` | – | `/config` | Speicherort für Konto + 2FA |
 | `SESSION_TTL` | – | `86400` | Gültigkeit der Sitzung (s) |
 | `LOGIN_MAX_FAILS` / `LOGIN_LOCKOUT_SECONDS` | – | `5` / `900` | Sperre nach Fehl-Logins |
-| `DROPS_ENABLED` | – | `false` | Live-Firewall-Drops-API (braucht eine eingebundene `drops.jsonl`) |
-| `DROPS_LOG_PATH` / `DROPS_MAX_EVENTS` / `DROPS_MAX_AGE_SECONDS` | – | `/crowdsec/drops/drops.jsonl` / `200` / `3600` | Drops-Quelle und Grenzen |
 
 <a id="de-sicherheit"></a>
 
@@ -388,7 +381,6 @@ Stil-Engine: [`assets/js/rocket-styles.js`](assets/js/rocket-styles.js) · Profi
 - [x] Herkünfte-Ansichten, 12 Sprachen, Offline-Paket
 - [x] Login + optionale 2FA, Sicherheitshärtung
 - [x] Schneller MMDB-Leser mit IP-Cache und Hintergrund-Aktualisierung
-- [ ] Sichtbares Panel für Live-Firewall-Drops
 - [ ] Oberfläche von 2.9.1 im Browser testen
 
 <p align="right"><a href="#-deutsch">⬆ nach oben</a></p>
