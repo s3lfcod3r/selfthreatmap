@@ -22,7 +22,7 @@ function launchRocketFromEvent(ev){
   }
 }
 function drainRocketQueue(ip){
-  if(!canLaunchRocketNow(ip))return;
+  if(!canLaunchRocketNow(ip)||!hasRocketCapacity())return;
   const q=pendingRocketsByIp.get(ip);
   if(!q||!q.length){pendingRocketsByIp.delete(ip);return;}
   const ev=q.shift();
@@ -40,7 +40,7 @@ function spawnRocketForEvent(ev){
   if(activeRockets.length>=MAX_ACTIVE_ROCKETS&&totalPendingRockets()>=MAX_PENDING_ROCKETS)return;
   spawnedRocketKeys.add(evKey);
   const ip=rocketQueueKey(ev);
-  if(!canLaunchRocketNow(ip)){
+  if(!canLaunchRocketNow(ip)||!hasRocketCapacity()){
     if(totalPendingRockets()>=MAX_PENDING_ROCKETS)return;
     const q=pendingRocketsByIp.get(ip);
     const maxIp=mapSettings.maxQueuePerIp??12;
@@ -212,7 +212,7 @@ function drawCrowdSecRockets(ts){
       ctx2d.beginPath();ctx2d.fillStyle=col;ctx2d.globalAlpha=0.45*(1-flash);
       ctx2d.arc(r.ex,r.ey,2.5*ik,0,Math.PI*2);ctx2d.fill();
     }
-    return r.t<1.02;
+    return r.t<1; // fertige Bahnen raus (t ist auf 1 begrenzt — 1.02 wurde nie erreicht)
   });
   drainAllRocketQueues();
   if(now-lastFlightLabelTs>=FLIGHT_LABEL_THROTTLE_MS){

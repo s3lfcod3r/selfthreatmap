@@ -1419,6 +1419,8 @@ function totalPendingRockets(){let n=0;pendingRocketsByIp.forEach(q=>{n+=q.lengt
 function trimActiveRockets(){
   while(activeRockets.length>MAX_ACTIVE_ROCKETS)activeRockets.shift();
 }
+// Platz für eine neue Bahn? Sonst wartet sie in der Queue — laufende Bahnen werden nie mittendrin entfernt
+function hasRocketCapacity(){return activeRockets.length<MAX_ACTIVE_ROCKETS;}
 function clearSpawnedRocketKeys(){spawnedRocketKeys.clear();}
 function rocketQueueKey(ev){return ev.ip||'?';}
 function canLaunchRocketNow(ip){return performance.now()>=(rocketLaunchAtByIp.get(ip)||0);}
