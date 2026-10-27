@@ -20,14 +20,7 @@ services:
       # Nur nötig wenn WHITELIST_ENABLED=true (Standard)
       - /EUER-PFAD/postoverflows:/crowdsec/postoverflows
 
-      # Für IP-Unban: Docker-Socket einbinden
-      # ⚠️  SICHERHEITSHINWEIS: Der Docker-Socket gibt faktisch Root-Rechte auf
-      #     dem Host. Das ":ro" verhindert das NICHT (Socket ≠ Datei). Nur
-      #     einbinden, wenn Unban/Whitelist-Restart wirklich gebraucht werden.
-      #     Härter: tecnativa/docker-socket-proxy mit nur den nötigen Rechten
-      #     vorschalten (EXEC für cscli), statt den vollen Socket zu mounten.
-      #     Wer Unban nicht braucht: diese Zeile entfernen.
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Kein Docker-Socket nötig: Unban läuft über die CrowdSec Local API (unten)
 
     environment:
       # ──────────────────────────────────────────────
@@ -41,7 +34,6 @@ services:
       # ℹ️  OPTIONAL: Weitere Einstellungen
       # ──────────────────────────────────────────────
       - SERVER_NAME=MeinServer          # Anzeigename im Dashboard
-      - CROWDSEC_CONTAINER=crowdsec     # Name des CrowdSec-Containers
       - CACHE_TTL=60                    # Cache-Zeit in Sekunden
       - DAYS_BACK=365                   # Wie viele Tage zurück anzeigen
 
@@ -51,9 +43,16 @@ services:
       # Nur ändern wenn ihr einen anderen Pfad nutzt:
       # - WHITELIST_FILE=/crowdsec/postoverflows/s01-whitelist/my-whitelist.yaml
       - WHITELIST_INTERVAL=900          # Prüfintervall in Sekunden (Standard: 15 min)
-      # Wartezeit nach CrowdSec-Neustart — erhöhen wenn Timeout-Fehler im Log erscheinen
-      - CROWDSEC_RESTART_WAIT=15
-      - CROWDSEC_RESTART_COOLDOWN=300     # Mindestabstand zwischen CrowdSec-Neustarts (Sekunden)
+
+      # ──────────────────────────────────────────────
+      # 🔑 CrowdSec Local API (LAPI) — für IP-Unban + Whitelist
+      # ──────────────────────────────────────────────
+      # Eigene Maschine im CrowdSec-Container anlegen:
+      #   docker exec crowdsec cscli machines add selfthreatmap --password 'LANGES-PASSWORT' -f /dev/null
+      # Ohne diese Werte läuft die Karte, aber Unban ist deaktiviert.
+      - CROWDSEC_LAPI_URL=http://crowdsec:8080   # bzw. http://IP-DES-CROWDSEC:8080
+      - CROWDSEC_LAPI_MACHINE_ID=selfthreatmap
+      - CROWDSEC_LAPI_PASSWORD=LANGES-PASSWORT
 
       # ──────────────────────────────────────────────
       # 🔐 LOGIN + 2FA (Zwei-Faktor) — schützt das ganze Dashboard
@@ -66,8 +65,3 @@ services:
       # - COOKIE_SECURE=true
       # Zugang komplett ohne Login (NUR vertrauenswürdiges LAN!):
       # - AUTH_ENABLED=false
-
-    # Docker-Gruppe für Socket-Zugriff (Unban + Whitelist-Restart)
-    # GID anpassen falls nötig: getent group docker | cut -d: -f3
-    group_add:
-      - "999"

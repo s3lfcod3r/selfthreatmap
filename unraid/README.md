@@ -38,8 +38,16 @@ Alternativ: im [Unraid Forum](https://forums.unraid.net/forum/35-docker-containe
 
 | Feld | Wert |
 |------|------|
-| Pflicht-Variablen | `SERVER_LAT`, `SERVER_LON`, `SERVER_NAME`, `CROWDSEC_CONTAINER` |
-| Optionale Variablen | `WHITELIST_ENABLED`, `WHITELIST_INTERVAL`, `CACHE_TTL`, `DAYS_BACK`, `CROWDSEC_RESTART_WAIT` |
+| Pflicht-Variablen | `SERVER_LAT`, `SERVER_LON`, `SERVER_NAME` |
+| CrowdSec-LAPI (für Unban) | `CROWDSEC_LAPI_URL`, `CROWDSEC_LAPI_MACHINE_ID`, `CROWDSEC_LAPI_PASSWORD` |
+| Optionale Variablen | `WHITELIST_ENABLED`, `WHITELIST_INTERVAL`, `CACHE_TTL`, `DAYS_BACK` |
 | Ports | `8080` (Dashboard) |
-| Volumes | `/crowdsec/data` (ro), `/crowdsec/postoverflows` (rw), `/var/run/docker.sock` (ro) |
-| Extra Params | `--group-add 999` (Docker-Socket-Zugriff) |
+| Volumes | `/config` (rw), `/crowdsec/data` (ro), `/crowdsec/postoverflows` (rw) — **kein Docker-Socket** |
+
+### Update von ≤ 3.0.0
+
+Ab 3.1.0 läuft das Unban über die CrowdSec Local API statt über den Docker-Socket:
+
+1. Im CrowdSec-Container eine Maschine anlegen: `cscli machines add selfthreatmap --password 'LANGES-PASSWORT' -f /dev/null`
+2. Im Template `CROWDSEC_LAPI_URL` (z. B. `http://192.168.1.7:8080`), `CROWDSEC_LAPI_MACHINE_ID` und `CROWDSEC_LAPI_PASSWORD` setzen.
+3. Die alte Pfad-Zuordnung `/var/run/docker.sock` und `--group-add 999` (Extra Parameters) entfernen.
