@@ -2,19 +2,112 @@
 # CrowdSec → Prometheus Exporter
 # Liest direkt aus der CrowdSec SQLite-DB + MaxMind GeoLite2-City.mmdb
 # Keine externen pip-Pakete nötig – nur Python3 stdlib + mmdb pure-python reader
-# Version: 3.0.0 | 2026-10-27
+# Version: 3.1.0 | 2026-10-27
 # Port: 9456
 
-import subprocess
 import os
 import ipaddress
+import json
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
-CROWDSEC_CONTAINER = os.environ.get("CROWDSEC_CONTAINER_NAME", "crowdsec")
-# Unban-Autorisierung läuft jetzt über die Login-Session (siehe auth.py),
-# nicht mehr über ein statisches API-Token.
+# ---------------------------------------------------------------------------
+# CrowdSec Local API (LAPI) — Unban läuft per HTTP gegen die LAPI, nicht mehr
+# per "docker exec … cscli". Damit braucht der Container keinen Docker-Socket.
+# Zugang: eigene Maschine anlegen (im CrowdSec-Container):
+#   cscli machines add selfthreatmap --password '<langes-passwort>' -f /dev/null
+# ---------------------------------------------------------------------------
+CROWDSEC_LAPI_URL        = os.environ.get("CROWDSEC_LAPI_URL", "http://crowdsec:8080").rstrip("/")
+CROWDSEC_LAPI_MACHINE_ID = os.environ.get("CROWDSEC_LAPI_MACHINE_ID", "").strip()
+CROWDSEC_LAPI_PASSWORD   = os.environ.get("CROWDSEC_LAPI_PASSWORD", "")
+LAPI_TOKEN_TTL = 1800  # JWT gilt bei CrowdSec 1h — nach 30 min neu anmelden
+# Unban-Autorisierung läuft über die Login-Session (siehe auth.py),
+# nicht über ein statisches API-Token.
+
+LAPI_MISSING_MSG = ("CrowdSec-LAPI-Zugang fehlt — CROWDSEC_LAPI_MACHINE_ID und "
+                    "CROWDSEC_LAPI_PASSWORD setzen (cscli machines add …)")
+
+class LapiError(Exception):
+    pass
+
+_lapi_lock = threading.Lock()
+_lapi_token = None
+_lapi_token_time = 0.0
+
+def lapi_configured():
+    return bool(CROWDSEC_LAPI_MACHINE_ID and CROWDSEC_LAPI_PASSWORD)
+
+def _lapi_request(method, path, body=None, token=None, timeout=10):
+    """Ein LAPI-Request → (HTTP-Status, JSON-Antwort). Netzfehler → LapiError."""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(CROWDSEC_LAPI_URL + path, data=data, method=method)
+    req.add_header("User-Agent", "selfthreatmap")
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read()
+            status = r.status
+    except urllib.error.HTTPError as e:
+        raw = e.read()
+        status = e.code
+    except (urllib.error.URLError, OSError) as e:
+        raise LapiError(f"CrowdSec-LAPI nicht erreichbar ({CROWDSEC_LAPI_URL}): {getattr(e, 'reason', e)}")
+    try:
+        payload = json.loads(raw) if raw else {}
+    except ValueError:
+        payload = {}
+    return status, payload if isinstance(payload, dict) else {"data": payload}
+
+def _lapi_login(force=False):
+    """JWT per Maschinen-Login holen (gecacht)."""
+    global _lapi_token, _lapi_token_time
+    if not lapi_configured():
+        raise LapiError(LAPI_MISSING_MSG)
+    with _lapi_lock:
+        if not force and _lapi_token and time.time() - _lapi_token_time < LAPI_TOKEN_TTL:
+            return _lapi_token
+        status, payload = _lapi_request("POST", "/v1/watchers/login", {
+            "machine_id": CROWDSEC_LAPI_MACHINE_ID,
+            "password": CROWDSEC_LAPI_PASSWORD,
+            "scenarios": [],
+        })
+        token = payload.get("token")
+        if status != 200 or not token:
+            _lapi_token = None
+            if status in (401, 403):
+                raise LapiError("CrowdSec-LAPI-Login abgelehnt — Machine-ID/Passwort prüfen "
+                                "(Maschine mit 'cscli machines list' kontrollieren)")
+            raise LapiError(f"CrowdSec-LAPI-Login fehlgeschlagen (HTTP {status}): "
+                            f"{payload.get('message', '')}".rstrip(": "))
+        _lapi_token, _lapi_token_time = token, time.time()
+        return token
+
+def lapi_call(method, path):
+    """Authentifizierter LAPI-Call; bei abgelaufenem Token einmal neu anmelden."""
+    status, payload = _lapi_request(method, path, token=_lapi_login())
+    if status == 401:
+        status, payload = _lapi_request(method, path, token=_lapi_login(force=True))
+    return status, payload
+
+def lapi_delete_decisions(ip):
+    """Alle Entscheidungen (Bans) für eine IP löschen → Anzahl gelöschter."""
+    status, payload = lapi_call("DELETE", "/v1/decisions?" + urllib.parse.urlencode({"ip": ip}))
+    if status != 200:
+        raise LapiError(f"Entscheidungen löschen fehlgeschlagen (HTTP {status}): "
+                        f"{payload.get('message', '')}".rstrip(": "))
+    try:
+        return int(payload.get("nbDeleted", 0))
+    except (TypeError, ValueError):
+        return 0
 
 def validate_ip(ip):
-    """IPv4/IPv6 prüfen — Schutz vor ungültigen cscli-Argumenten und YAML-Injection."""
+    """IPv4/IPv6 prüfen — Schutz vor ungültigen LAPI-Parametern und YAML-Injection."""
     try:
         ipaddress.ip_address(ip)
         return True
@@ -22,30 +115,29 @@ def validate_ip(ip):
         return False
 
 def run_unban(ip):
-    """IP aus CrowdSec-Bans entfernen via docker exec"""
+    """IP aus CrowdSec-Bans entfernen via LAPI"""
     global _cache_time
     if not validate_ip(ip):
         return False, "Ungültige IP-Adresse"
     try:
-        result = subprocess.run(
-            ["docker", "exec", CROWDSEC_CONTAINER, "cscli", "decisions", "delete", "--ip", ip],
-            capture_output=True, text=True, timeout=10
-        )
-        # Auch Alerts löschen
-        subprocess.run(
-            ["docker", "exec", CROWDSEC_CONTAINER, "cscli", "alerts", "delete", "--ip", ip],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode == 0:
-            log(f"✅ Unban erfolgreich: {ip}")
-            # IP merken damit sie nicht mehr im Feed erscheint
-            with _cache_lock:
-                _unbanned_ips[ip] = time.time()
-                _cache_time = 0  # Cache invalidieren → sofort neu laden
-            return True, f"IP {ip} erfolgreich entsperrt"
-        else:
-            log(f"❌ Unban fehlgeschlagen: {ip} — {result.stderr}")
-            return False, result.stderr.strip()
+        deleted = lapi_delete_decisions(ip)
+        # Alerts mitlöschen ist optional: die LAPI erlaubt das nur von
+        # localhost/trusted_ips. Der Feed blendet entsperrte IPs ohnehin aus.
+        try:
+            status, _ = lapi_call("DELETE", "/v1/alerts?" + urllib.parse.urlencode({"ip": ip}))
+            if status not in (200, 403):
+                log(f"ℹ️  Alerts für {ip} nicht gelöscht (HTTP {status})")
+        except LapiError:
+            pass
+        log(f"✅ Unban erfolgreich: {ip} ({deleted} Entscheidung(en) gelöscht)")
+        # IP merken damit sie nicht mehr im Feed erscheint
+        with _cache_lock:
+            _unbanned_ips[ip] = time.time()
+            _cache_time = 0  # Cache invalidieren → sofort neu laden
+        return True, f"IP {ip} erfolgreich entsperrt"
+    except LapiError as e:
+        log(f"❌ Unban fehlgeschlagen: {ip} — {e}")
+        return False, str(e)
     except Exception as e:
         log(f"❌ Unban Fehler: {e}")
         return False, str(e)
@@ -53,9 +145,6 @@ def run_unban(ip):
 import sqlite3
 import struct
 import socket
-import json
-import time
-import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timezone
 import sys
@@ -93,8 +182,6 @@ DAYS_BACK    = int(os.environ.get("DAYS_BACK",       "365"))
 WHITELIST_ENABLED   = os.environ.get("WHITELIST_ENABLED",  "true").lower() == "true"
 WHITELIST_FILE      = os.environ.get("WHITELIST_FILE",     "/crowdsec/postoverflows/s01-whitelist/my-whitelist.yaml")
 WHITELIST_INTERVAL  = int(os.environ.get("WHITELIST_INTERVAL", "900"))
-CROWDSEC_RESTART_WAIT = int(os.environ.get("CROWDSEC_RESTART_WAIT", "15"))  # Sekunden warten nach docker restart
-CROWDSEC_RESTART_COOLDOWN = int(os.environ.get("CROWDSEC_RESTART_COOLDOWN", "300"))  # Mindestabstand zwischen Neustarts
 
 SERVER_LAT   = float(os.environ.get("SERVER_LAT",  "0.0"))
 SERVER_LON   = float(os.environ.get("SERVER_LON",  "0.0"))
@@ -344,7 +431,6 @@ _whitelist_status = {
     "last_change": "",
     "status":    "unbekannt",  # "ok", "aktualisiert", "fehler", "unbekannt"
 }
-_whitelist_last_restart = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +451,20 @@ def _get_public_ip():
         except Exception:
             continue
     return None
+
+def _whitelist_unban(ip):
+    """Ban auf die eigene IP per LAPI entfernen. False bei LAPI-Fehler."""
+    if not lapi_configured():
+        log(f"⚠️  [Whitelist] {LAPI_MISSING_MSG}")
+        return False
+    try:
+        deleted = lapi_delete_decisions(ip)
+        if deleted:
+            log(f"🔓 [Whitelist] {deleted} Ban(s) auf eigene IP {ip} entfernt")
+        return True
+    except LapiError as e:
+        log(f"⚠️  [Whitelist] Ban-Prüfung fehlgeschlagen: {e}")
+        return False
 
 def _run_whitelist_update():
     """Whitelist-Update-Logik — analog zu deinem Shell-Script"""
@@ -398,14 +498,7 @@ def _run_whitelist_update():
     if current_ip == ip:
         log(f"✅ [Whitelist] IP unverändert ({ip}) — entferne ggf. aktiven Ban")
         # Trotzdem sicherstellen dass kein Ban existiert
-        try:
-            subprocess.run(
-                ["docker", "exec", CROWDSEC_CONTAINER, "cscli", "decisions", "delete", "--ip", ip],
-                capture_output=True, timeout=15
-            )
-        except subprocess.TimeoutExpired:
-            log("⚠️  [Whitelist] Timeout bei Ban-Prüfung — CrowdSec beschäftigt?")
-        _whitelist_status["status"] = "ok"
+        _whitelist_status["status"] = "ok" if _whitelist_unban(ip) else "fehler"
         return
 
     log(f"♻️  [Whitelist] IP geändert: {current_ip or 'neu'} → {ip}")
@@ -429,58 +522,14 @@ def _run_whitelist_update():
         _whitelist_status["status"] = "fehler"
         return
 
-    # CrowdSec neustarten (mit Cooldown gegen wiederholten DoS)
-    global _whitelist_last_restart
-    now = time.time()
-    if now - _whitelist_last_restart < CROWDSEC_RESTART_COOLDOWN:
-        log(f"⏳ [Whitelist] Neustart übersprungen (Cooldown {CROWDSEC_RESTART_COOLDOWN}s)")
-        try:
-            subprocess.run(
-                ["docker", "exec", CROWDSEC_CONTAINER, "cscli", "decisions", "delete", "--ip", ip],
-                capture_output=True, timeout=15
-            )
-        except subprocess.TimeoutExpired:
-            pass
-        _whitelist_status.update({"status": "aktualisiert", "last_change": datetime.now().strftime("%d.%m.%Y %H:%M:%S")})
-        return
-
-    log("🔄 [Whitelist] Starte CrowdSec neu...")
-    subprocess.run(["docker", "restart", CROWDSEC_CONTAINER], capture_output=True, timeout=90)
-    _whitelist_last_restart = time.time()
-
-    # Warten bis CrowdSec wieder läuft
-    # Erst 15s initial warten (CrowdSec braucht Zeit zum Hochfahren)
-    log(f"⏳ [Whitelist] Warte auf CrowdSec (initial {CROWDSEC_RESTART_WAIT}s)...")
-    time.sleep(CROWDSEC_RESTART_WAIT)
-    for attempt in range(15):
-        time.sleep(5)
-        try:
-            r = subprocess.run(
-                ["docker", "exec", CROWDSEC_CONTAINER, "cscli", "version"],
-                capture_output=True, timeout=15
-            )
-            if r.returncode == 0:
-                log(f"✅ [Whitelist] CrowdSec online (Versuch {attempt+1})")
-                break
-        except subprocess.TimeoutExpired:
-            log(f"⏳ [Whitelist] Noch nicht bereit (Versuch {attempt+1}/15)...")
-            continue
-    else:
-        log("❌ [Whitelist] CrowdSec kommt nicht hoch — Ban-Entfernung übersprungen")
+    # Ohne Docker-Socket wird CrowdSec nicht mehr neu gestartet: die Datei
+    # greift beim nächsten CrowdSec-Neustart. Bis dahin hebt jeder Lauf einen
+    # Ban auf die eigene IP über die LAPI wieder auf.
+    log("ℹ️  [Whitelist] Neue Whitelist greift beim nächsten CrowdSec-Neustart — "
+        "bis dahin wird ein Ban auf die eigene IP per LAPI entfernt")
+    if not _whitelist_unban(ip):
         _whitelist_status["status"] = "fehler"
         return
-
-    # Kurz noch extra warten damit LAPI vollständig initialisiert ist
-    time.sleep(5)
-
-    # Alten Ban entfernen (Fehler ignorieren — existiert vielleicht nicht)
-    try:
-        subprocess.run(
-            ["docker", "exec", CROWDSEC_CONTAINER, "cscli", "decisions", "delete", "--ip", ip],
-            capture_output=True, timeout=15
-        )
-    except subprocess.TimeoutExpired:
-        log("⚠️  [Whitelist] Ban-Entfernung Timeout — wird beim nächsten Lauf wiederholt")
 
     change_str = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     _whitelist_status.update({"status": "aktualisiert", "last_change": change_str})

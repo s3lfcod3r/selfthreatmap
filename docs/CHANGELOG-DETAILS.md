@@ -4,6 +4,18 @@ Ausführliche Release-Notes (Deutsch). Kurzfassung zweisprachig: [CHANGELOG.md](
 
 ---
 
+## v3.1.0 — 27.10.2026
+
+### 🔒 CrowdSec Local API statt Docker-Socket
+- **Unban per LAPI**: `run_unban()` meldet sich mit einem eigenen Maschinen-Konto an (`POST /v1/watchers/login`, JWT wird 30 min gecacht und bei `401` erneuert) und löscht die Entscheidungen mit `DELETE /v1/decisions?ip=…`. Alerts werden best effort per `DELETE /v1/alerts?ip=…` mitgelöscht — die LAPI erlaubt das nur von localhost/`trusted_ips`, sonst bleibt es beim Ausblenden im Feed.
+- **Neue Variablen**: `CROWDSEC_LAPI_URL` (Standard `http://crowdsec:8080`), `CROWDSEC_LAPI_MACHINE_ID`, `CROWDSEC_LAPI_PASSWORD`. Fehlen die Zugangsdaten, läuft die Karte weiter; Unban antwortet mit einer klaren Meldung, der Whitelist-Status steht auf „fehler“.
+- **Maschine anlegen**: `docker exec crowdsec cscli machines add selfthreatmap --password '…' -f /dev/null` — ohne `-f /dev/null` überschreibt `cscli` die eigenen LAPI-Zugangsdaten von CrowdSec.
+- **Entfernt**: Docker-Socket-Mount, `--group-add 999`, `docker-cli` im Image, `CROWDSEC_CONTAINER`, `CROWDSEC_RESTART_WAIT`, `CROWDSEC_RESTART_COOLDOWN`.
+- **Whitelist ohne Neustart**: Die YAML-Datei wird wie bisher geschrieben, CrowdSec aber nicht mehr neu gestartet (ging nur über den Socket). Sie greift beim nächsten CrowdSec-Neustart; bis dahin entfernt jeder Lauf (`WHITELIST_INTERVAL`) einen Ban auf die eigene IP per LAPI.
+- **Update von ≤ 3.0.0**: Maschine anlegen, die drei Variablen setzen, alte Socket-Zuordnung und `--group-add 999` aus dem Unraid-Template entfernen.
+
+---
+
 ## v2.9.1 — 04.10.2026
 
 ### 🛡️ MMDB-Reader: decode-Fix + IP-Cache + Hintergrund-Refresh

@@ -5,7 +5,7 @@
 **Live attack map straight from your local CrowdSec database.**<br>
 *Live-Angriffskarte direkt aus deiner lokalen CrowdSec-Datenbank.*
 
-![Version](https://img.shields.io/badge/version-3.0.0-33A78C)
+![Version](https://img.shields.io/badge/version-3.1.0-33A78C)
 [![License](https://img.shields.io/badge/license-All%20rights%20reserved-8A9CAA)](LICENSE)
 ![Backend](https://img.shields.io/badge/backend-Python%203.12-1F7763)
 ![Web](https://img.shields.io/badge/web-D3.js-43D3AD)
@@ -88,7 +88,7 @@ Browser ──▶ nginx :8080 ──┬─ /auth/*, login, setup, settings ─�
                           crowdsec_exporter.py (127.0.0.1:9456)
                              │ reads crowdsec.db + GeoLite2-City.mmdb (read-only)
                              │ writes whitelist YAML (postoverflows)
-                             └─ docker exec crowdsec cscli … (unban, restart)
+                             └─ CrowdSec Local API (HTTP, machine login) → unban
 ```
 
 <a id="en-quick-start"></a>
@@ -103,16 +103,21 @@ docker run -d \
   -v /path/to/selfthreatmap/config:/config \
   -v /path/to/crowdsec/data:/crowdsec/data:ro \
   -v /path/to/crowdsec/postoverflows:/crowdsec/postoverflows \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  --group-add 999 \
   -e SERVER_LAT=52.5200 \
   -e SERVER_LON=13.4050 \
   -e SERVER_NAME=Berlin \
   -e LANGUAGE=en \
+  -e CROWDSEC_LAPI_URL=http://crowdsec:8080 \
+  -e CROWDSEC_LAPI_MACHINE_ID=selfthreatmap \
+  -e CROWDSEC_LAPI_PASSWORD='long-password' \
   ghcr.io/s3lfcod3r/selfthreatmap:latest
 ```
 
 Open `http://<host>:8080` → create your admin **user + password**. Two-factor (TOTP) is optional — enable it afterwards under **Settings** by scanning the QR code (Google Authenticator / SelfAuthenticator). Compose file: [`docker/docker-compose.yml`](docker/docker-compose.yml).
+
+> **🔑 Unban via CrowdSec LAPI (no Docker socket):** create a dedicated machine inside the CrowdSec container and pass its credentials:
+> `docker exec crowdsec cscli machines add selfthreatmap --password 'long-password' -f /dev/null`
+> (`-f /dev/null` matters — otherwise CrowdSec's own `local_api_credentials.yaml` is overwritten.) Without these values the map works, but unban is disabled.
 
 > **💡 Tip:** coordinates — right-click in [Google Maps](https://maps.google.com) → "What's here?". CrowdSec data path: `docker inspect crowdsec | grep -A5 "Mounts"`.
 
@@ -139,14 +144,14 @@ Environment variables (no common prefix).
 | `SERVER_LAT` / `SERVER_LON` | ✅ | `0.0` | Your server coordinates (the map's home point) |
 | `SERVER_NAME` | – | `MeinServer` | Display name of the home marker |
 | `LANGUAGE` | – | `de` | Default UI language: `de` or `en` (12 languages in the app) |
-| `CROWDSEC_CONTAINER` | – | `crowdsec` | Name of the CrowdSec container |
+| `CROWDSEC_LAPI_URL` | – | `http://crowdsec:8080` | CrowdSec Local API, e.g. `http://192.168.1.7:8080` |
+| `CROWDSEC_LAPI_MACHINE_ID` / `CROWDSEC_LAPI_PASSWORD` | for unban | – | Credentials of a dedicated CrowdSec machine (`cscli machines add`) |
 | `CROWDSEC_DB_PATH` | – | `/crowdsec/data/crowdsec.db` | CrowdSec SQLite database |
 | `CROWDSEC_MMDB_PATH` | – | `/crowdsec/data/GeoLite2-City.mmdb` | GeoIP database (city names) |
 | `CACHE_TTL` / `DAYS_BACK` | – | `60` / `365` | Metric cache (s) and history window (days) |
 | `WHITELIST_ENABLED` | – | `true` | Dynamic self-IP whitelist |
 | `WHITELIST_FILE` | – | `/crowdsec/postoverflows/s01-whitelist/my-whitelist.yaml` | Whitelist file |
-| `WHITELIST_INTERVAL` | – | `900` | Whitelist check interval (s) |
-| `CROWDSEC_RESTART_WAIT` / `CROWDSEC_RESTART_COOLDOWN` | – | `15` / `300` | Wait after and minimum gap between CrowdSec restarts (s) |
+| `WHITELIST_INTERVAL` | – | `900` | Whitelist check interval (s); each run also lifts a ban on your own IP via the LAPI. A changed whitelist file takes effect at the next CrowdSec restart |
 | `AUTH_ENABLED` | – | `true` | Login (+ optional 2FA) for the whole dashboard |
 | `COOKIE_SECURE` | – | `false` | `true` when served over HTTPS only |
 | `CONFIG_DIR` | – | `/config` | Where account + 2FA data is stored |
@@ -163,7 +168,8 @@ Environment variables (no common prefix).
 - Exporter listens **only on `127.0.0.1`**; no CORS `*`; **CSP**, `Permissions-Policy`, `X-Frame-Options: DENY`
 - All backend fields are **escaped** in feed, tooltips and panels (XSS fixed); generic error messages instead of stack traces
 - No external CDN — everything bundled locally
-- **Deliberate trade-offs** (documented): the dashboard can lift CrowdSec bans via the **Docker socket**, which effectively means root on the host (`:ro` does not prevent that) — treat port **8080 like an admin UI**, keep it on LAN/VPN, put it behind HTTPS (`COOKIE_SECURE=true`) if reachable from outside; a [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) with only the needed rights is the harder option, or drop the socket if you don't need unban
+- **No Docker socket**: unban talks to the CrowdSec **Local API** with a dedicated machine account — the container has no access to the Docker host
+- **Deliberate trade-off** (documented): that machine account can delete CrowdSec decisions — treat port **8080 like an admin UI**, keep it on LAN/VPN, put it behind HTTPS (`COOKIE_SECURE=true`) if reachable from outside
 
 Security update history → [CHANGELOG.md](CHANGELOG.md) (entries marked 🔒).
 
@@ -272,7 +278,7 @@ Browser ──▶ nginx :8080 ──┬─ /auth/*, Login, Einrichtung, Einstell
                           crowdsec_exporter.py (127.0.0.1:9456)
                              │ liest crowdsec.db + GeoLite2-City.mmdb (nur lesend)
                              │ schreibt Whitelist-YAML (postoverflows)
-                             └─ docker exec crowdsec cscli … (Unban, Neustart)
+                             └─ CrowdSec Local API (HTTP, Maschinen-Login) → Unban
 ```
 
 <a id="de-schnellstart"></a>
@@ -287,16 +293,21 @@ docker run -d \
   -v /pfad/zu/selfthreatmap/config:/config \
   -v /pfad/zu/crowdsec/data:/crowdsec/data:ro \
   -v /pfad/zu/crowdsec/postoverflows:/crowdsec/postoverflows \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  --group-add 999 \
   -e SERVER_LAT=52.5200 \
   -e SERVER_LON=13.4050 \
   -e SERVER_NAME=Berlin \
   -e LANGUAGE=de \
+  -e CROWDSEC_LAPI_URL=http://crowdsec:8080 \
+  -e CROWDSEC_LAPI_MACHINE_ID=selfthreatmap \
+  -e CROWDSEC_LAPI_PASSWORD='langes-passwort' \
   ghcr.io/s3lfcod3r/selfthreatmap:latest
 ```
 
 `http://<host>:8080` öffnen → Admin-**Benutzer + Passwort** anlegen. Zwei-Faktor (TOTP) ist optional — danach unter **Einstellungen** per QR-Code aktivieren (Google Authenticator / SelfAuthenticator). Compose-Datei: [`docker/docker-compose.yml`](docker/docker-compose.yml).
+
+> **🔑 Unban über die CrowdSec-LAPI (kein Docker-Socket):** im CrowdSec-Container eine eigene Maschine anlegen und deren Zugangsdaten übergeben:
+> `docker exec crowdsec cscli machines add selfthreatmap --password 'langes-passwort' -f /dev/null`
+> (`-f /dev/null` ist wichtig — sonst wird CrowdSecs eigene `local_api_credentials.yaml` überschrieben.) Ohne diese Werte läuft die Karte, Unban ist dann deaktiviert.
 
 > **💡 Tipp:** Koordinaten — Rechtsklick in [Google Maps](https://maps.google.com) → „Was ist hier?“. CrowdSec-Datenpfad: `docker inspect crowdsec | grep -A5 "Mounts"`.
 
@@ -323,14 +334,14 @@ Umgebungsvariablen (ohne gemeinsames Präfix).
 | `SERVER_LAT` / `SERVER_LON` | ✅ | `0.0` | Koordinaten deines Servers (Heimatpunkt der Karte) |
 | `SERVER_NAME` | – | `MeinServer` | Anzeigename des Heimat-Markers |
 | `LANGUAGE` | – | `de` | Standardsprache: `de` oder `en` (12 Sprachen in der App) |
-| `CROWDSEC_CONTAINER` | – | `crowdsec` | Name des CrowdSec-Containers |
+| `CROWDSEC_LAPI_URL` | – | `http://crowdsec:8080` | CrowdSec Local API, z. B. `http://192.168.1.7:8080` |
+| `CROWDSEC_LAPI_MACHINE_ID` / `CROWDSEC_LAPI_PASSWORD` | für Unban | – | Zugang einer eigenen CrowdSec-Maschine (`cscli machines add`) |
 | `CROWDSEC_DB_PATH` | – | `/crowdsec/data/crowdsec.db` | CrowdSec-SQLite-Datenbank |
 | `CROWDSEC_MMDB_PATH` | – | `/crowdsec/data/GeoLite2-City.mmdb` | GeoIP-Datenbank (Stadtnamen) |
 | `CACHE_TTL` / `DAYS_BACK` | – | `60` / `365` | Metrik-Cache (s) und Zeitraum (Tage) |
 | `WHITELIST_ENABLED` | – | `true` | Dynamische Whitelist der eigenen IP |
 | `WHITELIST_FILE` | – | `/crowdsec/postoverflows/s01-whitelist/my-whitelist.yaml` | Whitelist-Datei |
-| `WHITELIST_INTERVAL` | – | `900` | Prüfintervall der Whitelist (s) |
-| `CROWDSEC_RESTART_WAIT` / `CROWDSEC_RESTART_COOLDOWN` | – | `15` / `300` | Wartezeit nach und Mindestabstand zwischen CrowdSec-Neustarts (s) |
+| `WHITELIST_INTERVAL` | – | `900` | Prüfintervall der Whitelist (s); jeder Lauf hebt zusätzlich einen Ban auf die eigene IP per LAPI auf. Eine geänderte Whitelist-Datei greift beim nächsten CrowdSec-Neustart |
 | `AUTH_ENABLED` | – | `true` | Login (+ optionale 2FA) für das ganze Dashboard |
 | `COOKIE_SECURE` | – | `false` | `true`, wenn nur über HTTPS erreichbar |
 | `CONFIG_DIR` | – | `/config` | Speicherort für Konto + 2FA |
@@ -347,7 +358,8 @@ Umgebungsvariablen (ohne gemeinsames Präfix).
 - Exporter lauscht **nur auf `127.0.0.1`**; kein CORS `*`; **CSP**, `Permissions-Policy`, `X-Frame-Options: DENY`
 - Alle Backend-Felder werden in Feed, Tooltips und Panels **escaped** (XSS behoben); allgemeine Fehlermeldungen statt Stacktraces
 - Kein externes CDN — alles lokal mitgeliefert
-- **Bewusste Kompromisse** (dokumentiert): Das Dashboard kann CrowdSec-Bans über den **Docker-Socket** aufheben, was faktisch Root auf dem Host bedeutet (`:ro` verhindert das nicht) — behandle Port **8080 wie eine Admin-Oberfläche**, nur im LAN/VPN nutzen, bei Erreichbarkeit von außen hinter HTTPS legen (`COOKIE_SECURE=true`); härter ist ein [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy) mit nur den nötigen Rechten, oder den Socket weglassen, wenn du kein Unban brauchst
+- **Kein Docker-Socket**: Unban spricht mit eigenem Maschinen-Konto die CrowdSec **Local API** an — der Container hat keinen Zugriff auf den Docker-Host
+- **Bewusster Kompromiss** (dokumentiert): Dieses Maschinen-Konto kann CrowdSec-Entscheidungen löschen — behandle Port **8080 wie eine Admin-Oberfläche**, nur im LAN/VPN nutzen, bei Erreichbarkeit von außen hinter HTTPS legen (`COOKIE_SECURE=true`)
 
 Verlauf der Sicherheitsupdates → [CHANGELOG.md](CHANGELOG.md) (Einträge mit 🔒).
 

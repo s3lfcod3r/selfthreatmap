@@ -2,13 +2,13 @@
 set -e
 
 # ============================================================
-# CrowdSec Threat Map — Container Entrypoint v3.0.0
+# CrowdSec Threat Map — Container Entrypoint v3.1.0
 # ============================================================
 
 log() { echo "[$(date '+%F %T')] $*"; }
 
 log "🛡️  CrowdSec Threat Map startet..."
-log "   Version: v3.0.0"
+log "   Version: v3.1.0"
 
 # ── Pflichtprüfungen ──
 if [ -z "$SERVER_LAT" ] || [ "$SERVER_LAT" = "0.0" ]; then
@@ -50,14 +50,23 @@ export CROWDSEC_MMDB_PATH="${CROWDSEC_MMDB_PATH:-/crowdsec/data/GeoLite2-City.mm
 export SERVER_LAT="${SERVER_LAT:-0.0}"
 export SERVER_LON="${SERVER_LON:-0.0}"
 export SERVER_NAME="${SERVER_NAME:-MeinServer}"
-export CROWDSEC_CONTAINER_NAME="${CROWDSEC_CONTAINER:-crowdsec}"
 export CACHE_TTL="${CACHE_TTL:-60}"
 export DAYS_BACK="${DAYS_BACK:-365}"
 export WHITELIST_ENABLED="${WHITELIST_ENABLED:-true}"
 export WHITELIST_FILE="${WHITELIST_FILE:-/crowdsec/postoverflows/s01-whitelist/my-whitelist.yaml}"
 export WHITELIST_INTERVAL="${WHITELIST_INTERVAL:-900}"
-export CROWDSEC_RESTART_WAIT="${CROWDSEC_RESTART_WAIT:-15}"
-export CROWDSEC_RESTART_COOLDOWN="${CROWDSEC_RESTART_COOLDOWN:-300}"
+
+# ── CrowdSec Local API (Unban + Whitelist-Ban-Entfernung) ──
+# Kein Docker-Socket mehr: Zugang über eine eigene CrowdSec-Maschine
+# (cscli machines add selfthreatmap --password '…' -f /dev/null)
+export CROWDSEC_LAPI_URL="${CROWDSEC_LAPI_URL:-http://crowdsec:8080}"
+export CROWDSEC_LAPI_MACHINE_ID="${CROWDSEC_LAPI_MACHINE_ID:-}"
+export CROWDSEC_LAPI_PASSWORD="${CROWDSEC_LAPI_PASSWORD:-}"
+if [ -n "$CROWDSEC_LAPI_MACHINE_ID" ] && [ -n "$CROWDSEC_LAPI_PASSWORD" ]; then
+    log "🔑 CrowdSec-LAPI: $CROWDSEC_LAPI_URL (Maschine: $CROWDSEC_LAPI_MACHINE_ID)"
+else
+    log "⚠️  CrowdSec-LAPI-Zugang fehlt (CROWDSEC_LAPI_MACHINE_ID / CROWDSEC_LAPI_PASSWORD) — Unban deaktiviert"
+fi
 
 # ── Login + 2FA (Auth) ──
 # Konto + 2FA werden beim ersten Aufruf im Browser eingerichtet und in

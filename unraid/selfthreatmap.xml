@@ -42,7 +42,7 @@
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/s3lfcod3r/selfthreatmap/main/unraid/selfthreatmap.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/s3lfcod3r/selfthreatmap/main/unraid/icon.png</Icon>
-  <ExtraParams>--group-add 999</ExtraParams>
+  <ExtraParams/>
   <PostArgs/>
   <CPUset/>
   <DateInstalled/>
@@ -96,17 +96,6 @@
     Required="false"
     Mask="false"></Config>
 
-  <Config
-    Name="Docker Socket"
-    Target="/var/run/docker.sock"
-    Default="/var/run/docker.sock"
-    Mode="ro"
-    Description="Docker Socket — wird für IP-Unban und dynamische Whitelist (CrowdSec-Neustart) benötigt. SICHERHEITSHINWEIS: Gibt faktisch Root-Rechte auf dem Host (':ro' schützt NICHT). Nur einbinden, wenn Unban/Whitelist-Restart gebraucht werden, sonst diese Zuordnung entfernen."
-    Type="Path"
-    Display="always"
-    Required="false"
-    Mask="false">/var/run/docker.sock</Config>
-
   <!-- ═══════ PFLICHT-VARIABLEN ═══════ -->
   <Config
     Name="Server Breitengrad (LAT)"
@@ -152,17 +141,39 @@
     Required="false"
     Mask="false">de</Config>
 
-  <!-- ═══════ CROWDSEC-CONTAINER ═══════ -->
+  <!-- ═══════ CROWDSEC LOCAL API (Unban, ohne Docker-Socket) ═══════ -->
   <Config
-    Name="CrowdSec Container-Name"
-    Target="CROWDSEC_CONTAINER"
-    Default="crowdsec"
+    Name="CrowdSec LAPI-URL"
+    Target="CROWDSEC_LAPI_URL"
+    Default="http://crowdsec:8080"
     Mode=""
-    Description="Name des CrowdSec Docker-Containers. Prüfen mit: docker ps | grep crowdsec"
+    Description="Adresse der CrowdSec Local API, z. B. http://192.168.1.7:8080 (CrowdSec mit eigener IP auf br0) oder http://crowdsec:8080 (gleiches Docker-Netz). Wird für IP-Unban und die Ban-Entfernung der dynamischen Whitelist genutzt — ein Docker-Socket ist nicht mehr nötig."
     Type="Variable"
     Display="always"
-    Required="true"
-    Mask="false">crowdsec</Config>
+    Required="false"
+    Mask="false">http://crowdsec:8080</Config>
+
+  <Config
+    Name="CrowdSec LAPI Machine-ID"
+    Target="CROWDSEC_LAPI_MACHINE_ID"
+    Default="selfthreatmap"
+    Mode=""
+    Description="Name einer eigenen CrowdSec-Maschine. Anlegen im CrowdSec-Container: cscli machines add selfthreatmap --password 'LANGES-PASSWORT' -f /dev/null (das -f /dev/null ist wichtig, sonst werden die Zugangsdaten von CrowdSec selbst überschrieben). Leer = Unban deaktiviert."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="false">selfthreatmap</Config>
+
+  <Config
+    Name="CrowdSec LAPI Passwort"
+    Target="CROWDSEC_LAPI_PASSWORD"
+    Default=""
+    Mode=""
+    Description="Passwort der oben genannten CrowdSec-Maschine (aus cscli machines add … --password)."
+    Type="Variable"
+    Display="always"
+    Required="false"
+    Mask="true"></Config>
 
   <!-- ═══════ WHITELIST ═══════ -->
   <Config
@@ -170,7 +181,7 @@
     Target="WHITELIST_ENABLED"
     Default="true"
     Mode=""
-    Description="Verhindert Selbst-Ban bei wechselnder IP (typisch bei deutschen Heimanschlüssen). Eigene IP wird automatisch alle 15 Minuten in CrowdSec gewhitelistet."
+    Description="Verhindert Selbst-Ban bei wechselnder IP (typisch bei deutschen Heimanschlüssen). Eigene IP wird alle 15 Minuten in die Whitelist-Datei geschrieben (greift ab dem nächsten CrowdSec-Neustart); ein Ban auf die eigene IP wird bis dahin per LAPI entfernt."
     Type="Variable"
     Display="always"
     Required="false"
@@ -221,17 +232,6 @@
     Required="false"
     Mask="false">365</Config>
 
-  <Config
-    Name="CrowdSec Restart Wartezeit (Sekunden)"
-    Target="CROWDSEC_RESTART_WAIT"
-    Default="15"
-    Mode=""
-    Description="Wartezeit nach CrowdSec-Neustart (bei Whitelist-Update). Erhöhen wenn Timeout-Fehler im Log erscheinen. Standard: 15 Sekunden."
-    Type="Variable"
-    Display="advanced"
-    Required="false"
-    Mask="false">15</Config>
-
   <!-- ═══════ LOGIN + 2FA (Zugangsschutz) ═══════ -->
   <Config
     Name="Login aktivieren (AUTH_ENABLED)"
@@ -254,16 +254,5 @@
     Display="advanced"
     Required="false"
     Mask="false">false</Config>
-
-  <Config
-    Name="CrowdSec Restart Cooldown (Sekunden)"
-    Target="CROWDSEC_RESTART_COOLDOWN"
-    Default="300"
-    Mode=""
-    Description="Mindestabstand zwischen automatischen CrowdSec-Neustarts bei Whitelist-Updates. Standard: 300 Sekunden."
-    Type="Variable"
-    Display="advanced"
-    Required="false"
-    Mask="false">300</Config>
 
 </Container>

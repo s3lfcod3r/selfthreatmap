@@ -5,6 +5,10 @@ Neueste Version zuerst. Ausführliche Release-Notes je Version: [docs/CHANGELOG-
 
 ---
 
+## 3.1.0 · October 2026 🔒
+- 🇬🇧 **No more Docker socket** — unban and the whitelist's ban removal now use the **CrowdSec Local API** with a dedicated machine account (`CROWDSEC_LAPI_URL`, `CROWDSEC_LAPI_MACHINE_ID`, `CROWDSEC_LAPI_PASSWORD`; create it with `cscli machines add … -f /dev/null`). `/var/run/docker.sock`, `--group-add 999`, `docker-cli`, `CROWDSEC_CONTAINER` and `CROWDSEC_RESTART_*` are gone. CrowdSec is no longer restarted automatically: a changed whitelist file takes effect at the next CrowdSec restart, until then every run lifts a ban on your own IP.
+- 🇩🇪 **Kein Docker-Socket mehr** — Unban und die Ban-Entfernung der Whitelist laufen jetzt über die **CrowdSec Local API** mit eigenem Maschinen-Konto (`CROWDSEC_LAPI_URL`, `CROWDSEC_LAPI_MACHINE_ID`, `CROWDSEC_LAPI_PASSWORD`; anlegen mit `cscli machines add … -f /dev/null`). `/var/run/docker.sock`, `--group-add 999`, `docker-cli`, `CROWDSEC_CONTAINER` und `CROWDSEC_RESTART_*` entfallen. CrowdSec wird nicht mehr automatisch neu gestartet: Eine geänderte Whitelist-Datei greift beim nächsten CrowdSec-Neustart, bis dahin hebt jeder Lauf einen Ban auf die eigene IP auf.
+
 ## 3.0.0 · October 2026
 - 🇬🇧 **Live firewall drops removed** (`/drops` API, `DROPS_*` variables, drops folder in the Unraid template) — the code came from a third-party fork. SelfThreatMap now contains only own code; the license is consistently *all rights reserved* (old GPL notes removed from `index.html` and the Docker label).
 - 🇩🇪 **Live-Firewall-Drops entfernt** (`/drops`-API, `DROPS_*`-Variablen, Drops-Verzeichnis in der Unraid-Vorlage) — der Code stammte aus einem fremden Fork. SelfThreatMap enthält jetzt nur eigenen Code; die Lizenz ist durchgehend *Alle Rechte vorbehalten* (alte GPL-Hinweise aus `index.html` und dem Docker-Label entfernt).
