@@ -12,6 +12,7 @@ Ausführliche Release-Notes (Deutsch). Kurzfassung zweisprachig: [CHANGELOG.md](
 - **Maschine anlegen**: `docker exec crowdsec cscli machines add selfthreatmap --password '…' -f /dev/null` — ohne `-f /dev/null` überschreibt `cscli` die eigenen LAPI-Zugangsdaten von CrowdSec.
 - **Entfernt**: Docker-Socket-Mount, `--group-add 999`, `docker-cli` im Image, `CROWDSEC_CONTAINER`, `CROWDSEC_RESTART_WAIT`, `CROWDSEC_RESTART_COOLDOWN`.
 - **Whitelist ohne Neustart**: Die YAML-Datei wird wie bisher geschrieben, CrowdSec aber nicht mehr neu gestartet (ging nur über den Socket). Sie greift beim nächsten CrowdSec-Neustart; bis dahin entfernt jeder Lauf (`WHITELIST_INTERVAL`) einen Ban auf die eigene IP per LAPI.
+- **User-Agent mit Version**: Alle LAPI-Anfragen senden `selfthreatmap/3.1.0`. CrowdSec 1.8.1 lehnt `POST /v1/watchers/login` sonst mit `401` ab (Log: `bad user agent`) — gegen die echte LAPI geprüft.
 - **Update von ≤ 3.0.0**: Maschine anlegen, die drei Variablen setzen, alte Socket-Zuordnung und `--group-add 999` aus dem Unraid-Template entfernen.
 
 ---
