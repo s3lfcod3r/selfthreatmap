@@ -46,8 +46,8 @@
   <PostArgs/>
   <CPUset/>
   <DateInstalled/>
-  <DonateText>Gefällt dir das Projekt? Gib einen Stern auf GitHub!</DonateText>
-  <DonateLink>https://github.com/s3lfcod3r/selfthreatmap</DonateLink>
+  <DonateText>EN: Like the project? Support it on Ko-fi ☕ — DE: Gefällt dir das Projekt? Unterstütze es auf Ko-fi ☕</DonateText>
+  <DonateLink>https://ko-fi.com/s3lfcod3r</DonateLink>
   <Requires>CrowdSec Docker Container</Requires>
 
   <!-- ═══════ PORT ═══════ -->
