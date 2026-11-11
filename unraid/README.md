@@ -7,7 +7,7 @@ Falls das Template noch nicht in CA gelistet ist:
 1. Unraid → **Apps** → oben rechts **"..." → "Add"**
 2. URL eintragen:
    ```
-   https://raw.githubusercontent.com/s3lfcod3r/selfthreatmap/main/unraid/selfthreatmap.xml
+   https://raw.githubusercontent.com/s3lfcod3r/unraid-templates/main/templates/selfthreatmap.xml
    ```
 3. Speichern → in CA nach "CrowdSec" suchen
 
@@ -22,15 +22,9 @@ Falls kein Icon vorhanden, fällt CA auf das Docker-Image-Label zurück.
 
 ---
 
-## Offiziell in CA eintragen (für Maintainer)
+## Community Applications
 
-Um das Template offiziell in Community Applications zu listen:
-
-1. Fork von [Squidly271/CA_AutoUpdate_Apps](https://github.com/Squidly271/CA_AutoUpdate_Apps) erstellen
-2. Repo-URL zu `data/plugins.json` hinzufügen
-3. Pull Request stellen
-
-Alternativ: im [Unraid Forum](https://forums.unraid.net/forum/35-docker-containers/) einen Thread erstellen und CA-Maintainer (@Squid) taggen.
+Das Template liegt in [s3lfcod3r/unraid-templates](https://github.com/s3lfcod3r/unraid-templates/blob/main/templates/selfthreatmap.xml) und ist von dort in Community Applications gelistet. Änderungen am Template nur dort.
 
 ---
 

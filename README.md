@@ -129,7 +129,7 @@ Open `http://<host>:8080` → create your admin **user + password**. Two-factor 
 ### 📦 Unraid
 
 Unraid → **Apps** → search `selfthreatmap` → install → fill in `SERVER_LAT` / `SERVER_LON` and the CrowdSec data path → **Apply**. Or add the template from
-`https://raw.githubusercontent.com/s3lfcod3r/selfthreatmap/main/unraid/selfthreatmap.xml`.
+`https://raw.githubusercontent.com/s3lfcod3r/unraid-templates/main/templates/selfthreatmap.xml`.
 Dashboard: `http://YOUR-UNRAID-IP:8080`.
 
 > **⚠️ Mount `/config`:** account, 2FA and session key live in `/config/auth.json` — without this volume your user is gone after an update.
@@ -319,7 +319,7 @@ docker run -d \
 ### 📦 Unraid
 
 Unraid → **Apps** → `selfthreatmap` suchen → installieren → `SERVER_LAT` / `SERVER_LON` und den CrowdSec-Datenpfad eintragen → **Anwenden**. Oder die Vorlage von
-`https://raw.githubusercontent.com/s3lfcod3r/selfthreatmap/main/unraid/selfthreatmap.xml`
+`https://raw.githubusercontent.com/s3lfcod3r/unraid-templates/main/templates/selfthreatmap.xml`
 hinzufügen. Dashboard: `http://DEINE-UNRAID-IP:8080`.
 
 > **⚠️ `/config` einbinden:** Konto, 2FA und Sitzungsschlüssel liegen in `/config/auth.json` — ohne dieses Volume ist dein Benutzer nach einem Update weg.
