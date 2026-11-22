@@ -26,7 +26,7 @@
 
 **SelfThreatMap** shows the attacks from your local **CrowdSec** database live on a world map — all attack points are visible on load, city names appear when you zoom in. It is a dashboard on top of an existing CrowdSec installation; it does **not** detect or block anything itself (that stays CrowdSec's job), but it can lift bans with one click.
 
-Part of the **Self** family (SelfMailer, SelfStream, SelfArchiver, SelfDashboard …) — same design system, same deploy style (GHCR → Unraid). Built on the original CrowdSec Threat Map.
+Part of the **Self** family (SelfMailer, SelfArchiver, SelfDashboard …) — same design system, same deploy style (GHCR → Unraid). Built on the original CrowdSec Threat Map.
 
 > **TL;DR** — world map with 30+ flight-path styles · 50+ profiles · search, ban status & unban · dynamic self-IP whitelist · login + optional 2FA · 12 languages · works offline
 
@@ -216,7 +216,7 @@ Style engine: [`assets/js/rocket-styles.js`](assets/js/rocket-styles.js) · prof
 
 **SelfThreatMap** zeigt Angriffe aus deiner lokalen **CrowdSec**-Datenbank live auf einer Weltkarte — beim Aufruf sind alle Angriffspunkte sichtbar, beim Reinzoomen erscheinen Stadtnamen. Es ist ein Dashboard auf einer bestehenden CrowdSec-Installation; selbst erkennt oder blockt es **nichts** (das bleibt Aufgabe von CrowdSec), es kann aber Bans per Klick aufheben.
 
-Teil der **Self**-Familie (SelfMailer, SelfStream, SelfArchiver, SelfDashboard …) — gleiches Design-System, gleicher Deploy-Stil (GHCR → Unraid). Basiert auf der ursprünglichen CrowdSec Threat Map.
+Teil der **Self**-Familie (SelfMailer, SelfArchiver, SelfDashboard …) — gleiches Design-System, gleicher Deploy-Stil (GHCR → Unraid). Basiert auf der ursprünglichen CrowdSec Threat Map.
 
 > **Kurz** — Weltkarte mit 30+ Bahn-Stilen · 50+ Profile · Suche, Ban-Status & Unban · dynamische Whitelist der eigenen IP · Login + optionale 2FA · 12 Sprachen · läuft offline
 
